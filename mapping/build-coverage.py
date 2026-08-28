@@ -48,6 +48,7 @@ def load_asvs() -> list:
 
 def main() -> None:
     reqs = load_asvs()
+    n_controls = len(MAP["controls"])
     by_id = {r["req_id"]: r for r in reqs}
 
     chapters = OrderedDict()
@@ -97,7 +98,8 @@ def main() -> None:
 
     total = len(reqs)
     w(f"**Headline: {len(cited)} of {total} ASVS {MAP['asvs_version']} requirements "
-      f"({len(cited) * 100 // total}%) are touched by at least one of the 42 controls.** "
+      f"({len(cited) * 100 // total}%) are touched by at least one of the {n_controls} "
+      "controls.** "
       f"The other {total - len(cited)} ({(total - len(cited)) * 100 // total}%) are not, "
       "and the chapter table below says where.\n")
 
@@ -164,8 +166,9 @@ def main() -> None:
         w(f"| {k} | {TIERS[k][1]} | {', '.join(str(i) for i in ids)} | {len(ids)} |")
     auto = len(tier_counts[1]) + len(tier_counts[2])
     w("")
-    w(f"**{auto} of 42 controls ({auto * 100 // 42}%) can be checked by CI this repository "
-      f"can ship.** The remaining {42 - auto} are a contract with the consuming project "
+    w(f"**{auto} of {n_controls} controls ({auto * 100 // n_controls}%) can be checked by CI "
+      f"this repository can ship.** The remaining {n_controls - auto} are a contract with the "
+      "consuming project "
       "(Tier 3) or an action someone takes and dates (Tier 4). Automating the automatable "
       "subset and being explicit about the rest is the honest position; a green pipeline is "
       "evidence about Tiers 1 and 2 and nothing else.\n")

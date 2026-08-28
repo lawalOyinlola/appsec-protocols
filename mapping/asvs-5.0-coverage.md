@@ -10,7 +10,7 @@ It claims: each control below was read against the ASVS requirements listed besi
 
 It does **not** claim ASVS compliance, alignment, or equivalence at any assurance level. A control that 'maps to' a requirement often covers part of it, occasionally states it more concretely, and sometimes is simply adjacent. Where ASVS is better, the note says so.
 
-**Headline: 118 of 345 ASVS 5.0.0 requirements (34%) are touched by at least one of the 42 controls.** The other 227 (65%) are not, and the chapter table below says where.
+**Headline: 118 of 345 ASVS 5.0.0 requirements (34%) are touched by at least one of the 43 controls.** The other 227 (65%) are not, and the chapter table below says where.
 
 ## Coverage by ASVS chapter
 
@@ -131,18 +131,20 @@ Tiers describe how a control can be checked, not how important it is:
 | 40 | Isolate tenants | 3 | `V8.4.1` | Direct match, and ASVS states it in one requirement. The control adds the operational surfaces that leak quietly - cache keys, search indexes, background jobs, file paths. |
 | 41 | Verify webhooks | 3 | `V4.1.5`, `V11.2.4` | PARTIAL GAP. V4.1.5 covers per-message digital signatures at L3 only; V11.2.4 covers constant-time comparison. ASVS has no requirement for webhook replay windows, event-id idempotency, or verifying over the raw pre-parse body. |
 | 42 | Keep payment authority on the server | 3 | `V2.2.2`, `V2.3.2`, `V8.3.1`, `V15.3.3` | PARTIAL. ASVS handles this as generic business-logic validation at a trusted service layer. It has no payment-specific requirement, so price tampering, coupon re-validation at charge time and webhook-as-source-of-truth are specialisations, not restatements. |
+| 43 | Make the security gate unbypassable | 1 | **none** | NO ASVS COVERAGE. Searched the released standard for pipeline, CI/CD, branch, version control, merge, code review and commit: zero requirements match. The two near-hits are different concerns - V13.4.1 covers not deploying .git metadata, V15.2.4 covers component provenance. ASVS verifies the application, not the pipeline that ships it, so every CI-enforced control in this protocol rests on an assumption the standard never states. |
 
 ## Controls with no ASVS counterpart
 
 - **37. Back up, and prove the restore** — NO ASVS COVERAGE. ASVS 5.0 contains no backup or restore requirement - it verifies the application, not the operational practice around it. V14.2.7 covers retention and deletion, which is the opposite concern. This control has no counterpart in the standard.
+- **43. Make the security gate unbypassable** — NO ASVS COVERAGE. Searched the released standard for pipeline, CI/CD, branch, version control, merge, code review and commit: zero requirements match. The two near-hits are different concerns - V13.4.1 covers not deploying .git metadata, V15.2.4 covers component provenance. ASVS verifies the application, not the pipeline that ships it, so every CI-enforced control in this protocol rests on an assumption the standard never states.
 
 ## Automation feasibility
 
 | Tier | What it means | Controls | Count |
 | :---: | --- | --- | ---: |
-| 1 | PR gate - static, no running app | 1, 2, 3, 15, 17, 22, 23, 31, 33, 34, 36 | 11 |
+| 1 | PR gate - static, no running app | 1, 2, 3, 15, 17, 22, 23, 31, 33, 34, 36, 43 | 12 |
 | 2 | Post-deploy probe - needs a deployed URL | 9, 20, 21, 27, 28 | 5 |
 | 3 | Test-suite contract - the consuming project writes it | 4, 6, 7, 8, 11, 13, 14, 16, 18, 19, 24, 25, 26, 29, 30, 32, 40, 41, 42 | 19 |
 | 4 | Attested manual - the control is the date | 5, 10, 12, 35, 37, 38, 39 | 7 |
 
-**16 of 42 controls (38%) can be checked by CI this repository can ship.** The remaining 26 are a contract with the consuming project (Tier 3) or an action someone takes and dates (Tier 4). Automating the automatable subset and being explicit about the rest is the honest position; a green pipeline is evidence about Tiers 1 and 2 and nothing else.
+**17 of 43 controls (39%) can be checked by CI this repository can ship.** The remaining 26 are a contract with the consuming project (Tier 3) or an action someone takes and dates (Tier 4). Automating the automatable subset and being explicit about the rest is the honest position; a green pipeline is evidence about Tiers 1 and 2 and nothing else.

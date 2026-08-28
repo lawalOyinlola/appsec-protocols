@@ -5,16 +5,28 @@ except the ruleset self-test.
 
 ## What is actually automatable
 
-Of the 42 security controls, **16 (38%) can be checked by CI**. The other 26 cannot, and
+Of the 43 security controls, **17 (39%) can be checked by CI**. The other 26 cannot, and
 saying so plainly is the point — a pipeline that implies full coverage is worse than no
 pipeline, because it converts an unknown into a false reassurance.
 
 | Tier | What it needs | Controls | Count | Status |
 | :---: | --- | --- | ---: | --- |
-| 1 | Nothing but the source | 1, 2, 3, 15, 17, 22, 23, 31, 33, 34, 36 | 11 | **built** — `pr-gate.yml` |
+| 1 | The source, and the repository's own settings | 1, 2, 3, 15, 17, 22, 23, 31, 33, 34, 36, 43 | 12 | **built** — `pr-gate.yml` |
 | 2 | A deployed URL | 9, 20, 21, 27, 28 | 5 | designed, not built |
 | 3 | A running app and a test database | 4, 6, 7, 8, 11, 13, 14, 16, 18, 19, 24, 25, 26, 29, 30, 32, 40, 41, 42 | 19 | a contract, not a scanner |
 | 4 | A person, and the date they did it | 5, 10, 12, 35, 37, 38, 39 | 7 | cannot be automated |
+
+**Control 43 is Tier 1 but is not wired into `pr-gate.yml`.** Its check is a single command
+against the forge API, so it needs no running app — but reading branch protection requires the
+`administration` scope, which the default workflow token does not carry. Wiring it in means an
+explicit permission grant or a PAT, and a gate that needs elevated credentials to check itself
+is a tradeoff worth making deliberately rather than by default. Run it by hand, or in a job you
+have chosen to give that scope:
+
+```bash
+gh api repos/:owner/:repo/branches/main/protection \
+  --jq '{checks: .required_status_checks.contexts, admins: .enforce_admins.enabled}'
+```
 
 **Control 13 (JWT) is the instructive case.** The ruleset does catch its static tells — an
 unpinned `algorithms` allowlist, `jwt.decode` used as verification, `alg: none`. But the

@@ -532,6 +532,14 @@
         "V15.3.3"
       ],
       "note": "PARTIAL. ASVS handles this as generic business-logic validation at a trusted service layer. It has no payment-specific requirement, so price tampering, coupon re-validation at charge time and webhook-as-source-of-truth are specialisations, not restatements."
+    },
+    {
+      "id": 43,
+      "title": "Make the security gate unbypassable",
+      "group": "I",
+      "tier": 1,
+      "asvs": [],
+      "note": "NO ASVS COVERAGE. Searched the released standard for pipeline, CI/CD, branch, version control, merge, code review and commit: zero requirements match. The two near-hits are different concerns - V13.4.1 covers not deploying .git metadata, V15.2.4 covers component provenance. ASVS verifies the application, not the pipeline that ships it, so every CI-enforced control in this protocol rests on an assumption the standard never states."
     }
   ]
 }

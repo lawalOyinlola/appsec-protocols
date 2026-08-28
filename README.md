@@ -10,11 +10,11 @@ after, when the finding is a rewrite instead of a line.
 
 | Skill | Controls | Scope |
 | --- | --- | --- |
-| [`security-protocols`](skills/security-protocols/SKILL.md) | 42 | Is the product **safe**? Secrets, data access, sessions, input/output, transport and supply chain, request surface, LLM features, injection surfaces, operations. |
+| [`security-protocols`](skills/security-protocols/SKILL.md) | 43 | Is the product **safe**? Secrets, data access, sessions, input/output, transport and supply chain, request surface, LLM features, injection surfaces, operations. |
 | [`legal-compliance`](skills/legal-compliance/SKILL.md) | 20 | Is the product **lawful**? Privacy policy, terms, AI disclosure, arbitration, auto-renewal, UGC/DMCA, app-store privacy labels — behind a jurisdiction gate. |
 | [`project-kickoff`](skills/project-kickoff/SKILL.md) | 18 | What must be true **before the first feature commit**. PRD, non-goals, ICP, locked stack, repo hygiene, environment separation, error tracking. |
 
-**80 controls. 80 verification steps.** That ratio is the design constraint, and it is
+**81 controls. 81 verification steps.** That ratio is the design constraint, and it is
 mechanically checkable:
 
 ```bash
@@ -110,14 +110,15 @@ redirect everything. ASVS is more precise, and the mapping records that.
 **[mapping/asvs-5.0-coverage.md](mapping/asvs-5.0-coverage.md) is the honest version of this
 claim**, generated against the released standard with every citation machine-validated:
 
-- **118 of 345 ASVS 5.0 requirements (34%)** are touched by at least one of the 42 controls.
+- **118 of 345 ASVS 5.0 requirements (34%)** are touched by at least one of the 43 controls.
   The other 227 are not.
 - **Strongest:** V9 Self-contained Tokens (85%), V13 Configuration (66%), V5 File Handling (61%).
 - **Weakest:** V17 WebRTC (0%, out of scope by design), V6 Authentication (10% of 47
   requirements — MFA, recovery flows and password policy detail are simply absent), V12 Secure
   Communication (16%), V10 OAuth/OIDC (22% of 36 requirements against a single control).
-- **One control has no ASVS counterpart at all:** control 37, backup and restore proof. ASVS
-  verifies the application, not the operational practice around it.
+- **Two controls have no ASVS counterpart at all:** control 37 (backup and restore proof) and
+  control 43 (an unbypassable CI gate). ASVS verifies the application, not the operational
+  practice around it nor the pipeline that ships it.
 
 So: use this to get a product shipped without the common failures. Read ASVS directly before
 doing serious work on authentication, OAuth, or cryptography, where the gap is widest. The
@@ -129,15 +130,15 @@ Honest state of the work, in the format the skills demand:
 
 | Item | State |
 | --- | --- |
-| 42 / 20 / 18 controls, each with a verify step | **PASS** — 80/80, checkable with the command above |
+| 43 / 20 / 18 controls, each with a verify step | **PASS** — 81/81, checkable with the command above |
 | Numbering sequential, cross-references resolve | **PASS** — verified 2026-08-28 |
 | ASVS 5.0 chapter mapping | **PASS** — [generated](mapping/asvs-5.0-coverage.md), 118/345 requirements touched, all 118 citations validated against the released standard |
 | CI: PR gate (secret scan, SAST, dependency audit, lockfile vetting) | **PASS** — [`ci/`](ci/), 19 semgrep rules, all tested against fixtures |
 | CI: post-deploy probe (headers, HTTPS, surface enumeration) | **DESIGNED, NOT BUILT** |
 | Distribution as a Claude Code plugin | **UNVERIFIED** — manifest schema not confirmed against current docs |
 
-**16 of the 42 security controls (38%) are mechanically checkable by CI this repo can ship** —
-11 at the PR gate, 5 against a deployed URL. Of the rest, 19 are a contract the consuming
+**17 of the 43 security controls (39%) are mechanically checkable by CI this repo can ship** —
+12 at the PR gate, 5 against a deployed URL. Of the rest, 19 are a contract the consuming
 project must write tests for and 7 are actions someone takes and dates. The per-tier breakdown
 is in the mapping. Being explicit about which is which is more useful than automating the easy
 half and implying the rest.
@@ -174,7 +175,7 @@ dependency, the name a squatter registers because models keep suggesting it.
 
 **[DISCLAIMER.md](DISCLAIMER.md) — read it.** In short: `legal-compliance` is not legal advice
 and creates no lawyer–client relationship; `security-protocols` is a baseline, not a guarantee,
-and working all 42 controls does not make an application secure. It makes 42 common failures
+and working all 43 controls does not make an application secure. It makes 43 common failures
 less likely.
 
 ## License

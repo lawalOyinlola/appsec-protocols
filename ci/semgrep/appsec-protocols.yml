@@ -1,0 +1,365 @@
+# Semgrep ruleset for the statically-checkable subset of security-protocols.
+#
+# Covers controls 3, 13, 15, 17, 31, 33, 34, 36. Each rule names its control so a
+# finding points at the protocol text that explains it, not just a CWE number.
+#
+# Scope: this is a PR gate (Tier 1), not an audit. These rules find the patterns that
+# are visible without running the app. A clean run is evidence about these patterns and
+# nothing else -- see mapping/asvs-5.0-coverage.md for what is not checkable here.
+#
+# Run:  semgrep --config ci/semgrep/appsec-protocols.yml .
+
+rules:
+  # ---------------------------------------------------------------- control 3
+  - id: appsec-service-role-key-in-client
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Control 3: service-role/admin key referenced in a file that may ship to the client.
+      This key bypasses every access rule you wrote -- treat it as root. Construct admin
+      clients only in files that client code can never import.
+    metadata:
+      control: 3
+      asvs: ["V13.3.2", "V8.3.1"]
+    paths:
+      include:
+        - "*client*"
+        - "*components/*"
+        - "*pages/*"
+        - "*app/*"
+        - "*src/*"
+      exclude:
+        - "*server*"
+        - "*api/*"
+        - "*.server.*"
+        - "*test*"
+        - "*spec*"
+    # NOTE: these patterns deliberately carry no metavariable-regex. A metavariable-regex
+    # constrains EVERY branch of a pattern-either, including branches that never bind the
+    # metavariable -- which silently disables them. That bug lived here: the service-role
+    # patterns below never fired, while the rule still looked healthy because a separate
+    # string branch did. Hardcoded literals are now a separate rule.
+    pattern-either:
+      - pattern: $X.SUPABASE_SERVICE_ROLE_KEY
+      - pattern: $X.SUPABASE_SERVICE_KEY
+      - pattern: $X.SERVICE_ROLE_KEY
+      - pattern: $X.SUPABASE_SERVICE_ROLE
+      - pattern-regex: |-
+          (?i)\bcreate(Client|ServerClient)\s*\([^)]{0,200}?service[_-]?role
+
+  - id: appsec-hardcoded-key-in-client
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Control 3/1: a live-looking key written as a literal in a file that may ship to the
+      client. Anything in a browser or mobile bundle is public. Secrets belong in the secret
+      manager and are used from a server route.
+    metadata:
+      control: 3
+      asvs: ["V13.3.1", "V13.3.2"]
+    paths:
+      include:
+        - "*client*"
+        - "*components/*"
+        - "*pages/*"
+        - "*app/*"
+        - "*src/*"
+      exclude:
+        - "*server*"
+        - "*api/*"
+        - "*.server.*"
+        - "*test*"
+        - "*spec*"
+    patterns:
+      - pattern-either:
+          - pattern: |
+              "$S"
+          - pattern: |
+              '$S'
+      - metavariable-regex:
+          metavariable: $S
+          regex: (?i).*(service_role|sk_live_|sk_test_).*
+
+  # --------------------------------------------------------------- control 13
+  - id: appsec-jwt-verify-without-algorithm-pinning
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Control 13: jwt.verify() without an explicit `algorithms` allowlist. An attacker can
+      hand an RS256 verifier an HS256 token signed with your public key as the HMAC secret
+      and mint any identity. Pin the algorithm server-side.
+    metadata:
+      control: 13
+      asvs: ["V9.1.2", "V9.1.1"]
+    patterns:
+      - pattern-either:
+          - pattern: jwt.verify($T, $K)
+          - pattern: $J.verify($T, $K)
+      - pattern-not: "jwt.verify($T, $K, {..., algorithms: [...], ...})"
+      - pattern-not: "$J.verify($T, $K, {..., algorithms: [...], ...})"
+
+  - id: appsec-jwt-decode-used-as-verification
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Control 13: jwt.decode() reads the payload without checking the signature. Anyone can
+      forge a token this trusts. Use jwt.verify() with a pinned algorithm allowlist.
+    metadata:
+      control: 13
+      asvs: ["V9.1.1"]
+    patterns:
+      - pattern-either:
+          - pattern: jwt.decode(...)
+          - pattern: jsonwebtoken.decode(...)
+
+  - id: appsec-jwt-algorithm-none
+    languages: [javascript, typescript, python]
+    severity: ERROR
+    message: >-
+      Control 13: the 'none' algorithm disables signature verification entirely. Reject it.
+    metadata:
+      control: 13
+      asvs: ["V9.1.2"]
+    pattern-regex: |-
+      (?i)["']?alg["']?\s*:\s*["']none["']|algorithms\s*[=:]\s*\[\s*["']none["']
+
+  # --------------------------------------------------------------- control 15
+  - id: appsec-raw-sql-unsafe
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Control 15: raw-SQL escape hatch. These bypass parameterization -- user input reaching
+      one is SQL injection. Use the parameterized form ($queryRaw with a tagged template,
+      not $queryRawUnsafe). ORDER BY and table names cannot be parameterized and must be
+      checked against a fixed allowlist.
+    metadata:
+      control: 15
+      asvs: ["V1.2.4"]
+    pattern-either:
+      - pattern: $P.$queryRawUnsafe(...)
+      - pattern: $P.$executeRawUnsafe(...)
+      - pattern: $DB.raw(...)
+      - pattern: knex.raw(...)
+
+  - id: appsec-sql-string-interpolation
+    languages: [javascript, typescript, python]
+    severity: ERROR
+    message: >-
+      Control 15: SQL assembled by string interpolation. Never build SQL by concatenation or
+      by a template literal with a variable in it. Use parameterized queries. ORDER BY and
+      table names cannot be parameterized and must be checked against a fixed allowlist.
+    metadata:
+      control: 15
+      asvs: ["V1.2.4"]
+    pattern-either:
+      # Untagged template literal: `SELECT ... ${x}`.
+      # The lookbehind excludes TAGGED templates -- prisma.$queryRaw`...${x}` and the sql`...`
+      # helpers parameterize their interpolations and are the correct idiom, not a finding.
+      - pattern-regex: |-
+          (?i)(?<![\w$])`[^`]{0,200}?\b(select|insert|update|delete)\b[^`]{0,200}?\$\{
+      # Concatenation: "SELECT ... " + value
+      - pattern-regex: |-
+          (?i)["'][^"'\n]{0,200}?\b(select|insert|update|delete)\b[^"'\n]{0,200}?["']\s*\+
+      # Python f-string: f"SELECT ... {x}"
+      - pattern-regex: |-
+          (?i)\bf["'][^"'\n]{0,200}?\b(select|insert|update|delete)\b[^"'\n]{0,200}?\{
+      # Python %-format: "SELECT ... %s" % (x,)
+      - pattern-regex: |-
+          (?i)["'][^"'\n]{0,200}?\b(select|insert|update|delete)\b[^"'\n]{0,200}?["']\s*%\s
+
+  - id: appsec-nosql-operator-injection
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      Control 15: a request value passed straight into a query filter. NoSQL takes operator
+      injection rather than string injection -- {"password": {"$ne": null}} where a string was
+      expected turns the filter into "match anything". Coerce to the expected primitive and
+      reject keys starting with '$'.
+    metadata:
+      control: 15
+      asvs: ["V1.2.4", "V2.2.1"]
+    pattern-either:
+      - pattern: "$C.find({..., $F: $REQ.body.$X, ...})"
+      - pattern: "$C.findOne({..., $F: $REQ.body.$X, ...})"
+      - pattern: $C.findOne($REQ.body)
+      - pattern: $C.find($REQ.body)
+
+  # --------------------------------------------------------------- control 17
+  - id: appsec-dangerous-html-sink
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      Control 17: an escape hatch out of the framework's default escaping. Each hit needs a
+      sanitizer (DOMPurify) in the same path, or the value must be provably not user content.
+    metadata:
+      control: 17
+      asvs: ["V1.3.1", "V1.2.1", "V3.2.2"]
+    pattern-either:
+      - pattern: "<$EL dangerouslySetInnerHTML={...} />"
+      - pattern: $X.innerHTML = $V
+      - pattern: $X.outerHTML = $V
+      - pattern: $X.insertAdjacentHTML(...)
+      - pattern: document.write(...)
+
+  - id: appsec-javascript-url-sink
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Control 17: never put user input into a javascript: URL or an inline event handler.
+    metadata:
+      control: 17
+      asvs: ["V1.2.1", "V1.2.2"]
+    pattern-regex: |-
+      (?i)href\s*=\s*[{"']\s*javascript:
+
+  - id: appsec-eval-on-dynamic-value
+    languages: [javascript, typescript, python]
+    severity: ERROR
+    message: >-
+      Control 17/34: dynamic code execution. If the value is ever attacker-influenced this is
+      remote code execution. ASVS V1.3.2 requires avoiding eval outright.
+    metadata:
+      control: 17
+      asvs: ["V1.3.2"]
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+      - pattern: exec(...)
+
+  # --------------------------------------------------------------- control 31
+  - id: appsec-path-from-user-input
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Control 31: a request value used to build a filesystem path. Rejecting literal '..' is
+      not enough -- %2e%2e%2f, ....//, overlong UTF-8 and Windows separators all get past a
+      naive filter. Resolve the candidate, then assert it still starts with the intended root.
+      Better: take an opaque id and look the real path up.
+    metadata:
+      control: 31
+      asvs: ["V5.3.2", "V5.4.1", "V1.1.1"]
+    pattern-either:
+      - pattern: path.join(..., $REQ.params.$X, ...)
+      - pattern: path.join(..., $REQ.query.$X, ...)
+      - pattern: path.join(..., $REQ.body.$X, ...)
+      - pattern: path.resolve(..., $REQ.params.$X, ...)
+      - pattern: path.resolve(..., $REQ.query.$X, ...)
+      - pattern: fs.readFile($REQ.query.$X, ...)
+      - pattern: fs.readFileSync($REQ.query.$X, ...)
+      - pattern: fs.createReadStream($REQ.query.$X, ...)
+      - pattern: res.sendFile($REQ.query.$X, ...)
+      - pattern: res.sendFile($REQ.params.$X, ...)
+
+  # --------------------------------------------------------------- control 33
+  - id: appsec-shell-command-construction
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Control 33: a shell is being invoked. Use the array form with a fixed binary --
+      spawn("convert", [inp, out]) -- never an interpolated string and never shell:true.
+      With no shell there is no metacharacter to escape. This outranks almost everything
+      else: the prize is direct code execution.
+    metadata:
+      control: 33
+      asvs: ["V1.2.5"]
+    pattern-either:
+      - pattern: child_process.exec(...)
+      - pattern: child_process.execSync(...)
+      - pattern: exec($CMD, ...)
+      - pattern: execSync(...)
+      - pattern: "$F(..., {..., shell: true, ...})"
+
+  - id: appsec-shell-command-construction-py
+    languages: [python]
+    severity: ERROR
+    message: >-
+      Control 33: shell invocation from Python. Use subprocess with a list argv and without
+      shell=True. os.system takes a single string and is always a shell.
+    metadata:
+      control: 33
+      asvs: ["V1.2.5"]
+    pattern-either:
+      - pattern: os.system(...)
+      - pattern: os.popen(...)
+      - pattern: subprocess.$F(..., shell=True, ...)
+
+  # --------------------------------------------------------------- control 34
+  - id: appsec-unsafe-deserialization-py
+    languages: [python]
+    severity: ERROR
+    message: >-
+      Control 34: these formats reconstruct typed objects, so parsing attacker-controlled
+      bytes is remote code execution before any of your logic runs. Use JSON plus a schema --
+      JSON has no type-instantiation semantics, which is exactly why it is safe here.
+    metadata:
+      control: 34
+      asvs: ["V1.5.2"]
+    patterns:
+      - pattern-either:
+          - pattern: pickle.loads(...)
+          - pattern: pickle.load(...)
+          - pattern: cPickle.loads(...)
+          - pattern: yaml.load($D)
+          - pattern: yaml.load($D, Loader=yaml.Loader)
+          - pattern: yaml.load($D, Loader=yaml.UnsafeLoader)
+          - pattern: yaml.unsafe_load(...)
+          - pattern: marshal.loads(...)
+      - pattern-not: yaml.load($D, Loader=yaml.SafeLoader)
+      - pattern-not: yaml.load($D, Loader=SafeLoader)
+
+  - id: appsec-unsafe-deserialization-other
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Control 34: object-reconstructing deserializer. Each hit must be reading data your own
+      server produced and signed, never a request body.
+    metadata:
+      control: 34
+      asvs: ["V1.5.2"]
+    paths:
+      include: ["*.php", "*.rb", "*.cs", "*.java"]
+    pattern-regex: |-
+      (?i)\b(unserialize\s*\(|Marshal\.load|BinaryFormatter|readObject\s*\(\s*\))
+
+  - id: appsec-xml-external-entities
+    languages: [python]
+    severity: WARNING
+    message: >-
+      Control 34: XML parser that may resolve external entities (XXE). Disable entity
+      resolution or use defusedxml.
+    metadata:
+      control: 34
+      asvs: ["V1.5.1"]
+    pattern-either:
+      - pattern: xml.etree.ElementTree.parse(...)
+      - pattern: xml.dom.minidom.parse(...)
+      - pattern: lxml.etree.fromstring(...)
+
+  # --------------------------------------------------------------- control 36
+  - id: appsec-logging-whole-request
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      Control 36: logging the whole request object prints headers -- including Authorization
+      and Cookie. Redact at the logger, not at each call site.
+    metadata:
+      control: 36
+      asvs: ["V16.2.5"]
+    pattern-either:
+      - pattern: console.log($REQ)
+      - pattern: console.log($REQ.headers)
+      - pattern: console.log($REQ.body)
+      - pattern: $LOG.info($REQ)
+      - pattern: $LOG.debug($REQ)
+
+  - id: appsec-logging-credentials
+    languages: [javascript, typescript, python]
+    severity: ERROR
+    message: >-
+      Control 36: a credential is being written to a log. Logs are the most common place a
+      well-protected secret leaks.
+    metadata:
+      control: 36
+      asvs: ["V16.2.5", "V16.4.2"]
+    pattern-regex: |-
+      (?i)(console\.(log|info|warn|error)|logger?\.(info|debug|warn|error)|print)\s*\([^)]{0,80}\b(password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|session[_-]?id)\b

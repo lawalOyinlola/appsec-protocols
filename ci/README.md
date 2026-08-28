@@ -44,7 +44,7 @@ control is FAIL.*
 
 ## Why the ruleset has its own test suite
 
-Two failure modes, both silent, both caught during development by this harness:
+Three failure modes, all silent, all caught during development by this harness:
 
 **A rule that never fires.** The fixtures originally lived in `semgrep/tests/`, and semgrep's
 default ignore list skips any path containing `tests` — so the first full run reported *zero
@@ -55,6 +55,18 @@ control, it is a line in a config file.
 `$queryRaw` tagged template, which is the *correct* parameterized idiom and is
 character-for-character similar to the unsafe form. A gate that flags correct code gets
 switched off by whoever has to merge, which is the same as not having it.
+
+**A rule that looks healthy while half of it is dead.** The control 3 rule combined
+service-role-key patterns with a hardcoded-literal pattern under one `metavariable-regex`.
+That constraint applies to *every* branch of a `pattern-either`, including branches that
+never bind the metavariable — so the service-role patterns, the distinctive part of the
+control, silently matched nothing. The rule still fired, because the literal branch did, so
+the per-rule assertion passed. It is now two rules, and both must fire independently.
+
+That third one is the uncomfortable lesson: the test harness itself gave a green result for a
+rule that was half broken. Asserting "the rule fired" is weaker than asserting "each thing
+the rule claims to catch was caught," and the fix was structural — split the rule until each
+assertion means something — rather than a better assertion.
 
 So: `test-semgrep-rules.sh` runs in CI alongside the rules themselves.
 

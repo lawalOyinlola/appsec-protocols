@@ -1,11 +1,11 @@
 ---
 name: security-protocols
-description: Baseline security protocol (42 controls) for any app that will be used by real people. Load BEFORE writing auth, database access, file uploads, API endpoints, session handling, payment/checkout flows, LLM calls, backups, webhooks, or deploy config — and run as a full audit before any launch, beta, or public deploy. Triggers on "is this secure", "security review", "before launch", "going live", "pre-launch checklist", "harden", "pentest", "did I leak a key", "RLS", "rate limit", "CSRF", "CORS", "security headers", "prompt injection", "SSRF", "path traversal", "command injection", "IDOR", "BOLA", "XSS", "SQL injection", "NoSQL injection", "mass assignment", "insecure deserialisation", "JWT", "OAuth", "session management", "webhook signature", "audit log", "backups", "restore", "tenant isolation", "least privilege", "staging environment", "typosquatting", plus any task touching secrets, passwords, tokens, cookies, uploads, payments, or logs.
+description: Baseline security protocol (43 controls) for any app that will be used by real people. Load BEFORE writing auth, database access, file uploads, API endpoints, session handling, payment/checkout flows, LLM calls, backups, webhooks, or deploy config — and run as a full audit before any launch, beta, or public deploy. Triggers on "is this secure", "security review", "before launch", "going live", "pre-launch checklist", "harden", "pentest", "did I leak a key", "RLS", "rate limit", "CSRF", "CORS", "security headers", "prompt injection", "SSRF", "path traversal", "command injection", "IDOR", "BOLA", "XSS", "SQL injection", "NoSQL injection", "mass assignment", "insecure deserialisation", "JWT", "OAuth", "session management", "webhook signature", "audit log", "backups", "restore", "tenant isolation", "least privilege", "staging environment", "typosquatting", "branch protection", "CI/CD pipeline", plus any task touching secrets, passwords, tokens, cookies, uploads, payments, or logs.
 ---
 
 # Security Protocols
 
-The non-negotiable baseline. Forty-two controls, grouped by the phase where they must be
+The non-negotiable baseline. Forty-three controls, grouped by the phase where they must be
 enforced. **Every control has a verification step — a control is not "done" until it has been
 proven with a command, a test, or an inspected response.** Claiming a control is satisfied
 without running its check is a violation of this protocol.
@@ -18,12 +18,12 @@ Which groups apply:
 | F | 24–28 | anything serving HTTP |
 | G | 29–30 | only if it calls an LLM |
 | H | 31–34 | injection surfaces — check each against the stack; several may be `N/A` |
-| I | 35–42 | before launch. 40 only if multi-tenant, 41–42 only with webhooks/payments |
+| I | 35–43 | before launch. 40 only if multi-tenant, 41–42 only with webhooks/payments, 43 once CI exists |
 
 ## How to use this skill
 
 - **Building a feature** → read the relevant group below *before* writing the code, not after.
-- **Pre-launch audit** → work all 42 in order, and write results to `tasks/security-audit.md`
+- **Pre-launch audit** → work all 43 in order, and write results to `tasks/security-audit.md`
   in the project (one line per control: `PASS` / `FAIL` / `N/A + why`). Never report a blanket
   "all secure" — report per control, with the evidence.
 - **Not applicable is a valid answer**, but it must be justified in one line. Silence is not.
@@ -437,7 +437,7 @@ attacker-controlled bytes is remote code execution, before any of your logic run
 
 ---
 
-## Group I — Operations (35–42; verify before launch, not after the incident)
+## Group I — Operations (35–43; verify before launch, not after the incident)
 
 These are the controls that determine whether you can *detect* a breach and *recover* from one.
 They were previously listed here as aspirations; they are controls, and they have checks.
@@ -528,9 +528,38 @@ The client is a price-editing UI unless you decide otherwise.
 - **Verify:** intercept the checkout request, change the amount and the coupon, and confirm the
   charge is unchanged. Then hit `/success` directly without paying and confirm nothing is granted.
 
+### 43. Make the security gate unbypassable
+Every control enforced in CI assumes nobody can route around CI. If a commit can reach the
+default branch without passing the pipeline, the pipeline is advisory — and controls 22 and 23
+in particular become decorative, because they run on pull requests that an urgent fix will
+simply skip.
+- **Protect the default branch at the forge, not by convention.** Require the security jobs as
+  status checks, require a pull request before merging, and block force-pushes and deletions.
+  A rule that lives in someone's memory is not a control.
+- **Include administrators.** The bypass that gets used is the one belonging to the person
+  under time pressure, which on a small team is the owner. A protection rule that exempts
+  admins protects the repository from everyone who could not have merged anyway.
+- **A required check that nothing reports blocks everything.** Configure the protection and
+  the workflow together: a status check is required by *name*, so a job renamed or never run
+  leaves every pull request waiting on a result that will never arrive. With admin enforcement
+  on, that state cannot be cleared by merging past it. Add the workflow first, let it report
+  once, then require it.
+- **Pin what the pipeline runs.** Third-party actions by commit SHA, not tag — a tag is mutable
+  by whoever owns the action, so an unpinned action is a standing write-access grant to a
+  stranger. Restrict who can edit workflow files, and treat a PR that changes the gate as a
+  security review of the gate.
+- **Least privilege for the pipeline itself.** Default the workflow token to read-only and
+  grant writes per job. A build step that can push to the default branch has undone this
+  control. CI secrets must not be exposed to pull requests from forks.
+- **Verify:** from a clean clone, commit directly to the default branch and push — expect a
+  rejection. Then read the protection back from the API rather than the settings page:
+  `gh api repos/:owner/:repo/branches/main/protection --jq '{checks: .required_status_checks.contexts, admins: .enforce_admins.enabled, force: .allow_force_pushes.enabled}'`
+  A `404` means there is no protection at all, which is the most common finding. Confirm each
+  listed check name matches a job that actually runs.
+
 ---
 
-## Beyond the forty-two (add when the project reaches them)
+## Beyond the forty-three (add when the project reaches them)
 
 - **Account deletion / data export** — required by GDPR-style regimes if you have EU/UK users,
   and the retention promise must match what the code actually deletes. See `legal-compliance`.

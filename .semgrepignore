@@ -1,0 +1,19 @@
+# Scan-level excludes for this repository.
+#
+# Note: providing this file REPLACES semgrep's built-in defaults, so the usual entries are
+# repeated here explicitly rather than inherited.
+
+node_modules/
+.venv/
+vendor/
+dist/
+build/
+.git/
+
+# The fixtures are deliberately vulnerable code that the ruleset is tested against. They
+# must not be scanned as if they were application source -- but they MUST still be scanned
+# by ci/scripts/test-semgrep-rules.sh, which passes them explicitly.
+#
+# This is why the fixtures are not in a directory called `tests/`: semgrep's DEFAULT ignore
+# list skips any path containing `tests`, which silently made all rules report zero findings.
+ci/semgrep/fixtures/

@@ -102,12 +102,26 @@ and should not be read as one.
 
 What this adds is downstream: a triaged subset sized for one person shipping a product, with an
 executable verification step attached to each item, and reporting rules that make a dishonest
-audit harder to produce. Where the two disagree, ASVS is right.
+audit harder to produce. Where the two disagree, ASVS is right — and in at least one place it
+already is: ASVS V4.1.2 says only user-facing endpoints should auto-redirect HTTP to HTTPS,
+because redirecting API endpoints teaches clients that plaintext is acceptable. Control 21 says
+redirect everything. ASVS is more precise, and the mapping records that.
 
-**The formal chapter-by-chapter mapping has not been done yet.** Until it is, this repository
-makes no claim of ASVS coverage or alignment — see Status below. Claiming alignment without
-having done the mapping would violate rule 1 above, in a repository whose entire argument is
-rule 1.
+**[mapping/asvs-5.0-coverage.md](mapping/asvs-5.0-coverage.md) is the honest version of this
+claim**, generated against the released standard with every citation machine-validated:
+
+- **118 of 345 ASVS 5.0 requirements (34%)** are touched by at least one of the 42 controls.
+  The other 227 are not.
+- **Strongest:** V9 Self-contained Tokens (85%), V13 Configuration (66%), V5 File Handling (61%).
+- **Weakest:** V17 WebRTC (0%, out of scope by design), V6 Authentication (10% of 47
+  requirements — MFA, recovery flows and password policy detail are simply absent), V12 Secure
+  Communication (16%), V10 OAuth/OIDC (22% of 36 requirements against a single control).
+- **One control has no ASVS counterpart at all:** control 37, backup and restore proof. ASVS
+  verifies the application, not the operational practice around it.
+
+So: use this to get a product shipped without the common failures. Read ASVS directly before
+doing serious work on authentication, OAuth, or cryptography, where the gap is widest. The
+mapping exists so you can see *which* is which rather than taking my word for the coverage.
 
 ## Status
 
@@ -117,14 +131,16 @@ Honest state of the work, in the format the skills demand:
 | --- | --- |
 | 42 / 20 / 18 controls, each with a verify step | **PASS** — 80/80, checkable with the command above |
 | Numbering sequential, cross-references resolve | **PASS** — verified 2026-08-28 |
-| ASVS 5.0 chapter mapping | **NOT DONE** — no coverage claim is made until it is |
+| ASVS 5.0 chapter mapping | **PASS** — [generated](mapping/asvs-5.0-coverage.md), 118/345 requirements touched, all 118 citations validated against the released standard |
 | CI: PR gate (secret scan, SAST, dependency audit) | **DESIGNED, NOT BUILT** |
 | CI: post-deploy probe (headers, HTTPS, surface enumeration) | **DESIGNED, NOT BUILT** |
 | Distribution as a Claude Code plugin | **UNVERIFIED** — manifest schema not confirmed against current docs |
 
-Roughly half the 42 security controls are mechanically checkable at all. The rest are tests the
-consuming project must write, or actions someone must take and date. Being explicit about which
-is which is more useful than automating the easy half and implying the rest.
+**16 of the 42 security controls (38%) are mechanically checkable by CI this repo can ship** —
+11 at the PR gate, 5 against a deployed URL. Of the rest, 19 are a contract the consuming
+project must write tests for and 7 are actions someone takes and dates. The per-tier breakdown
+is in the mapping. Being explicit about which is which is more useful than automating the easy
+half and implying the rest.
 
 Aligned to the threat landscape as of **2026-08**. Security guidance goes stale, and stale
 guidance actively misleads — if this date is far behind you, treat the specifics as suspect.

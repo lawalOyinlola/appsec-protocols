@@ -1,0 +1,67 @@
+# The Tier 1 gate, running on this repository itself.
+#
+# ci/pr-gate.yml is the template consumers copy. This is the adapted version: appsec-protocols
+# has no npm or Python project, so the dependency-audit and lockfile-vetting jobs are omitted
+# rather than left to fail on a repo with nothing to vet.
+#
+# Job names are deliberately short because they are the required status check identifiers in
+# branch protection. Keep them in sync with:
+#   gh api repos/:owner/:repo/branches/main/protection --jq '.required_status_checks.contexts'
+#
+# A green run here is evidence about controls 1, 2, 3, 15, 17, 31, 33, 34, 36 on this repo's
+# own source, and nothing else.
+
+name: pr gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # control 2 is about what was committed, ever
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: pipx install semgrep==1.172.0
+      - name: this repo must pass its own ruleset
+        # .semgrepignore excludes ci/semgrep/fixtures — the deliberately vulnerable code the
+        # rules are tested against. That exclusion is why the selftest below scans a copy
+        # outside the repo instead.
+        run: semgrep --config ci/semgrep/appsec-protocols.yml --error --metrics=off .
+
+  ruleset-selftest:
+    name: ruleset selftest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: pipx install semgrep==1.172.0
+      - name: every rule fires on vulnerable code, none on correct code
+        run: ci/scripts/test-semgrep-rules.sh
+
+  mapping:
+    name: asvs mapping reproduces
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: regenerate and assert no drift
+        # Fails if the checked-in coverage report does not match what the map produces, or if
+        # any cited ASVS id is absent from the released standard.
+        run: |
+          python3 mapping/build-coverage.py
+          git diff --exit-code mapping/asvs-5.0-coverage.md

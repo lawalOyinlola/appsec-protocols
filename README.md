@@ -132,7 +132,7 @@ Honest state of the work, in the format the skills demand:
 | 42 / 20 / 18 controls, each with a verify step | **PASS** — 80/80, checkable with the command above |
 | Numbering sequential, cross-references resolve | **PASS** — verified 2026-08-28 |
 | ASVS 5.0 chapter mapping | **PASS** — [generated](mapping/asvs-5.0-coverage.md), 118/345 requirements touched, all 118 citations validated against the released standard |
-| CI: PR gate (secret scan, SAST, dependency audit, lockfile vetting) | **PASS** — [`ci/`](ci/), 18 semgrep rules, all tested against fixtures |
+| CI: PR gate (secret scan, SAST, dependency audit, lockfile vetting) | **PASS** — [`ci/`](ci/), 19 semgrep rules, all tested against fixtures |
 | CI: post-deploy probe (headers, HTTPS, surface enumeration) | **DESIGNED, NOT BUILT** |
 | Distribution as a Claude Code plugin | **UNVERIFIED** — manifest schema not confirmed against current docs |
 
@@ -147,13 +147,13 @@ guidance actively misleads — if this date is far behind you, treat the specifi
 
 ## CI
 
-[`ci/`](ci/) implements the Tier 1 PR gate: gitleaks, an 18-rule semgrep ruleset written
+[`ci/`](ci/) implements the Tier 1 PR gate: gitleaks, a 19-rule semgrep ruleset written
 against these controls, a dependency audit, and lockfile vetting for control 23.
 
 The ruleset has its own test suite ([`ci/scripts/test-semgrep-rules.sh`](ci/scripts/test-semgrep-rules.sh)),
 which asserts every rule fires on vulnerable code and none fire on correct code. Both halves
 caught real bugs while it was being built — semgrep's default ignore list skips any path
-containing `tests`, so the first full run reported zero findings across all 18 rules and
+containing `tests`, so the first full run reported zero findings across every rule and
 looked like a pass; and the SQL rule flagged Prisma's `$queryRaw` tagged template, which is
 the correct parameterized idiom.
 

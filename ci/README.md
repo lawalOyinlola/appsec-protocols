@@ -37,7 +37,7 @@ control is FAIL.*
 | File | Purpose |
 | --- | --- |
 | `pr-gate.yml` | GitHub Actions workflow. Secret scan, SAST, dependency audit, lockfile vetting. |
-| `semgrep/appsec-protocols.yml` | 18 rules covering controls 3, 15, 17, 31, 33, 34, 36, plus static patterns for 13. Each rule carries its control number and ASVS ids. |
+| `semgrep/appsec-protocols.yml` | 19 rules covering controls 3, 15, 17, 31, 33, 34, 36, plus static patterns for 13. Each rule carries its control number and ASVS ids. |
 | `semgrep/fixtures/` | Vulnerable and correct code the rules are tested against. |
 | `scripts/test-semgrep-rules.sh` | Asserts every rule fires on vulnerable code and none fire on correct code. |
 | `scripts/lockfile-diff.sh` | Control 23. Lists packages a PR adds and flags new, little-used, or non-existent ones. |
@@ -48,7 +48,7 @@ Three failure modes, all silent, all caught during development by this harness:
 
 **A rule that never fires.** The fixtures originally lived in `semgrep/tests/`, and semgrep's
 default ignore list skips any path containing `tests` — so the first full run reported *zero
-findings across all 18 rules* and looked like a pass. A rule nobody has watched fire is not a
+findings across every rule* and looked like a pass. A rule nobody has watched fire is not a
 control, it is a line in a config file.
 
 **A rule that always fires.** The SQL-interpolation rule initially flagged Prisma's

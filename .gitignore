@@ -28,3 +28,7 @@ Thumbs.db
 
 # Internal working notes, not part of the published repo
 HANDOFF.md
+
+# ASVS release data, fetched at build time by mapping/build-coverage.py.
+# Not committed: it is OWASP content under CC BY-SA 4.0, and this repo is MIT.
+mapping/.asvs-cache.json

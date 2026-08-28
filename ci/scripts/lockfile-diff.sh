@@ -75,8 +75,17 @@ def names(path):
             if not key:
                 continue
             out.add(key.split("node_modules/")[-1])
-        for key in d.get("dependencies", {}):
-            out.add(key)
+
+        # lockfileVersion 1 nests transitive deps under dependencies.<name>.dependencies.
+        # Walking only the top level would miss exactly the packages control 23 is about:
+        # the ones a version bump pulls in without anyone naming them.
+        def walk(deps):
+            for name, meta in (deps or {}).items():
+                out.add(name)
+                if isinstance(meta, dict):
+                    walk(meta.get("dependencies"))
+
+        walk(d.get("dependencies"))
     else:
         # pnpm-lock.yaml / yarn.lock: entries look like /name/version or "name@range:"
         for m in re.finditer(r"^\s{0,4}[\"']?/?((?:@[\w.-]+/)?[\w.-]+)@", text, re.M):

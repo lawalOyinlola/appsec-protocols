@@ -92,7 +92,14 @@ jobs:
         if: hashFiles('requirements.txt', 'pyproject.toml') != ''
         run: |
           pipx install pip-audit
-          pip-audit
+          # Point pip-audit at the project's dependency source. Invoked bare it audits the
+          # CURRENT ENVIRONMENT, which this job never installs into -- so it would scan an
+          # empty environment and pass, which is worse than not running it.
+          if [ -f requirements.txt ]; then
+            pip-audit --requirement requirements.txt
+          else
+            pip-audit .
+          fi
 
   supply-chain:
     name: "control 23 — vet added packages"

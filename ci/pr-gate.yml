@@ -1,0 +1,118 @@
+# Tier 1 PR gate for security-protocols.
+#
+# Copy to .github/workflows/pr-gate.yml in a consuming project.
+#
+# WHAT THIS PROVES: the statically checkable subset of the protocol — controls 1, 2, 3, 15,
+# 17, 22, 23, 31, 33, 34, 36. That is 11 of 42 controls at this gate, plus 5 more in
+# ci/post-deploy-probe.yml (not yet built). A green run is evidence about those and NOTHING
+# ELSE. The SAST job also flags the static tells of control 13, but 13's verify step needs a
+# running app and is not discharged here.
+#
+# WHAT IT DOES NOT PROVE: the 19 Tier 3 controls need a running app and a test database and
+# are a contract this repo hands you, not a scan it can perform. The 7 Tier 4 controls need
+# a person to do something and record the date. See mapping/asvs-5.0-coverage.md.
+#
+# Do not let this file become the thing you point at when asked whether the app is secure.
+#
+# Actions are pinned by commit SHA, not tag — control 22 requires it, and a tag is mutable
+# by whoever owns the action.
+
+name: security pr gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: "controls 1, 2 — secret scan"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history: control 2 is about what was committed, ever
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: control 1 — no secret in a built client bundle
+        run: |
+          # Only meaningful if the build ran. Absent a build, this is explicitly skipped
+          # rather than silently passed.
+          shopt -s nullglob
+          dirs=(dist .next build out)
+          found=0
+          for d in "${dirs[@]}"; do [ -d "$d" ] && found=1; done
+          if [ "$found" -eq 0 ]; then
+            echo "SKIP — no build output present. Control 1 is UNVERIFIED in this run,"
+            echo "not passed. Build before this step to check it."
+            exit 0
+          fi
+          if grep -rIlE "sk_live|sk_test|-----BEGIN [A-Z ]*PRIVATE KEY|service_role" "${dirs[@]}" 2>/dev/null; then
+            echo "FAIL — secret material found in build output (control 1)"
+            exit 1
+          fi
+          echo "PASS — no secret pattern in build output"
+
+  sast:
+    name: "controls 3, 15, 17, 31, 33, 34, 36 (+13 partial) — semgrep"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: install semgrep
+        # Pin the version. If you prefer the container, resolve its digest yourself with
+        # `docker buildx imagetools inspect semgrep/semgrep:<tag>` -- do not copy a digest
+        # from anywhere you have not verified, including from this file.
+        run: pipx install semgrep==1.172.0
+      - name: appsec-protocols ruleset
+        run: |
+          semgrep --config ci/semgrep/appsec-protocols.yml \
+                  --error --metrics=off .
+      - name: community rulesets (breadth this repo does not attempt)
+        run: |
+          semgrep --config p/owasp-top-ten --config p/secrets \
+                  --error --metrics=off .
+
+  dependencies:
+    name: "control 22 — known vulnerabilities"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - name: npm audit
+        if: hashFiles('package-lock.json') != ''
+        run: npm audit --audit-level=high
+      - name: pip-audit
+        if: hashFiles('requirements.txt', 'pyproject.toml') != ''
+        run: |
+          pipx install pip-audit
+          pip-audit
+
+  supply-chain:
+    name: "control 23 — vet added packages"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: lockfile diff
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          ci/scripts/lockfile-diff.sh "origin/${{ github.base_ref }}"
+
+  ruleset-selftest:
+    name: "the gate's own rules must be tested"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: install semgrep
+        run: pipx install semgrep==1.172.0
+      - name: every rule fires on vulnerable code, none on correct code
+        run: ci/scripts/test-semgrep-rules.sh

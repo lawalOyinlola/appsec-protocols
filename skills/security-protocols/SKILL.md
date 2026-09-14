@@ -1,6 +1,6 @@
 ---
 name: security-protocols
-description: Baseline security protocol (43 controls) for any app that will be used by real people. Load BEFORE writing auth, database access, file uploads, API endpoints, session handling, payment/checkout flows, LLM calls, backups, webhooks, or deploy config — and run as a full audit before any launch, beta, or public deploy. Triggers on "is this secure", "security review", "before launch", "going live", "pre-launch checklist", "harden", "pentest", "did I leak a key", "RLS", "rate limit", "CSRF", "CORS", "security headers", "prompt injection", "SSRF", "path traversal", "command injection", "IDOR", "BOLA", "XSS", "SQL injection", "NoSQL injection", "mass assignment", "insecure deserialisation", "JWT", "OAuth", "session management", "webhook signature", "audit log", "backups", "restore", "tenant isolation", "least privilege", "staging environment", "typosquatting", "branch protection", "CI/CD pipeline", plus any task touching secrets, passwords, tokens, cookies, uploads, payments, or logs.
+description: Baseline security protocol (44 controls) for any app that will be used by real people. Load BEFORE writing auth, database access, file uploads, API endpoints, session handling, payment/checkout flows, LLM calls, backups, webhooks, or deploy config — and run as a full audit before any launch, beta, or public deploy. Triggers on "is this secure", "security review", "before launch", "going live", "pre-launch checklist", "harden", "pentest", "did I leak a key", "RLS", "rate limit", "CSRF", "CORS", "security headers", "prompt injection", "SSRF", "path traversal", "command injection", "IDOR", "BOLA", "XSS", "SQL injection", "NoSQL injection", "mass assignment", "insecure deserialisation", "JWT", "OAuth", "session management", "webhook signature", "audit log", "backups", "restore", "tenant isolation", "least privilege", "staging environment", "typosquatting", "branch protection", "CI/CD pipeline", "agent skill", "MCP server", "plugin marketplace", plus any task touching secrets, passwords, tokens, cookies, uploads, payments, or logs.
 ---
 
 # Security Protocols
@@ -18,7 +18,7 @@ Which groups apply:
 | F | 24–28 | anything serving HTTP |
 | G | 29–30 | only if it calls an LLM |
 | H | 31–34 | injection surfaces — check each against the stack; several may be `N/A` |
-| I | 35–43 | before launch. 40 only if multi-tenant, 41–42 only with webhooks/payments, 43 once CI exists |
+| I | 35–44 | before launch. 40 only if multi-tenant, 41–42 only with webhooks/payments, 43 once CI exists, 44 if anyone on the team uses an AI coding agent |
 
 ## How to use this skill
 
@@ -42,7 +42,22 @@ terms, AI disclosure, data-deletion rights — is `legal-compliance`. Before a l
 No secret in client-side code, ever. Anything shipped to a browser or mobile bundle is public,
 including `NEXT_PUBLIC_*` / `VITE_*` / `EXPO_PUBLIC_*` vars — those are for public identifiers
 only. Third-party API calls that need a secret go through a server route or backend proxy.
-- **Verify:** grep the built bundle, not the source: `grep -rE "sk_live|sk_test|-----BEGIN|api[_-]?key" dist/ .next/ build/`
+
+**Where a secret lives, and who holds it.** Not committing one is half the control. The other
+half is that the secret exists somewhere regardless, and every copy is a place it can leak from.
+- **One source of truth:** a secret manager or the platform's encrypted environment config.
+  Not a shared doc, not a pinned Slack message, not a screenshot, not a chat with an AI
+  assistant. Those are permanent, searchable copies you do not control and cannot revoke.
+- **Need-to-know, and prefer per-person or per-service credentials over one shared key.** A
+  shared key cannot be revoked from one person — revoking it means rotating for everyone, so
+  in practice nobody does, and access quietly outlives the reason for it.
+- **Offboarding is a rotation, not a checkbox.** If someone who has left ever held a shared
+  production secret, rotating it is the only real revocation.
+- **Verify:** two checks. (1) Grep the built bundle, not the source:
+  `grep -rE "sk_live|sk_test|-----BEGIN|api[_-]?key" dist/ .next/ build/`
+  (2) For each production secret, name every human and system that can read it today. If you
+  cannot produce that list, that *is* the finding; if it is longer than the people who
+  currently need it, rotate.
 - **Also:** `.env*` must be gitignored (`.env.example` with placeholder values is the committed one).
 
 ### 2. Purge Git secrets
@@ -437,7 +452,7 @@ attacker-controlled bytes is remote code execution, before any of your logic run
 
 ---
 
-## Group I — Operations (35–43; verify before launch, not after the incident)
+## Group I — Operations (35–44; verify before launch, not after the incident)
 
 These are the controls that determine whether you can *detect* a breach and *recover* from one.
 They were previously listed here as aspirations; they are controls, and they have checks.
@@ -557,9 +572,35 @@ simply skip.
   A `404` means there is no protection at all, which is the most common finding. Confirm each
   listed check name matches a job that actually runs.
 
+### 44. Vet what you install into your own agent
+Your coding agent runs with your permissions: your filesystem, your credentials, your repo. A
+skill, plugin, or MCP server is not a document it reads, it is an instruction it follows — and
+the files that ship in the bundle are a different object from the text that eventually executes.
+- **A skill that fetches instructions from a URL is remote code you have not reviewed.** The
+  bundle you audited and the text the agent obeys are separated by an HTTP request, so whoever
+  controls that URL can change the second after you approved the first. Static scanning cannot
+  catch this by construction. Researchers at AIR demonstrated it end to end in 2026: a skill
+  passed Cisco, NVIDIA and marketplace scanners while its external link served genuine vendor
+  documentation, then served instructions to download and run a script once adoption was up.
+  (Install counts in that write-up are self-reported and unverified; the mechanism is not.)
+- **Check the publisher and the destination, not the description.** Does the vendor actually
+  publish this, from their own domain? A convincing name plus a plausible docs link is the whole
+  attack. Anthropic's own guidance is to use skills only from sources you created or trust, and
+  it names external-URL fetches as the particular risk.
+- **Pin and vendor what you keep.** Copy the skill into the repo, review it there, update
+  deliberately. A skill that changed maintainer is a new skill and needs a new review.
+- **Least privilege for the agent itself.** Don't run it in a directory whose environment holds
+  production credentials, and prefer per-project scope over a global install. Surface matters:
+  Claude Code skills have the same network access as any other program on the machine, while
+  API-side skills run sandboxed without network.
+- **Verify:** list every URL reachable from an installed skill and account for each host.
+  `grep -rEoh 'https?://[^[:space:])"]+' ~/.claude/skills/ .claude/skills/ 2>/dev/null | sort -u`
+  A skill fetching instructions from a domain that is not the vendor's own is the finding:
+  remove it, or vendor a reviewed copy and drop the fetch.
+
 ---
 
-## Beyond the forty-three (add when the project reaches them)
+## Beyond the forty-four (add when the project reaches them)
 
 - **Account deletion / data export** — required by GDPR-style regimes if you have EU/UK users,
   and the retention promise must match what the code actually deletes. See `legal-compliance`.

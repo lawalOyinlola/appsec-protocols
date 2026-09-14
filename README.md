@@ -116,9 +116,10 @@ claim**, generated against the released standard with every citation machine-val
 - **Weakest:** V17 WebRTC (0%, out of scope by design), V6 Authentication (10% of 47
   requirements — MFA, recovery flows and password policy detail are simply absent), V12 Secure
   Communication (16%), V10 OAuth/OIDC (22% of 36 requirements against a single control).
-- **Two controls have no ASVS counterpart at all:** control 37 (backup and restore proof) and
-  control 43 (an unbypassable CI gate). ASVS verifies the application, not the operational
-  practice around it nor the pipeline that ships it.
+- **Three controls have no ASVS counterpart at all:** control 37 (backup and restore proof),
+  control 43 (an unbypassable CI gate), and control 44 (vetting what you install into your own
+  agent). ASVS verifies the application, not the operational practice around it, the pipeline
+  that ships it, nor the toolchain that builds it.
 
 So: use this to get a product shipped without the common failures. Read ASVS directly before
 doing serious work on authentication, OAuth, or cryptography, where the gap is widest. The
@@ -130,16 +131,16 @@ Honest state of the work, in the format the skills demand:
 
 | Item | State |
 | --- | --- |
-| 43 / 20 / 18 controls, each with a verify step | **PASS** — 81/81, checkable with the command above |
-| Numbering sequential, cross-references resolve | **PASS** — verified 2026-08-28 |
+| 44 / 20 / 18 controls, each with a verify step | **PASS** — 82/82, checkable with the command above |
+| Numbering sequential, cross-references resolve | **PASS** — verified 2026-09-14 |
 | ASVS 5.0 chapter mapping | **PASS** — [generated](mapping/asvs-5.0-coverage.md), 118/345 requirements touched, all 118 citations validated against the released standard |
 | CI: PR gate (secret scan, SAST, dependency audit, lockfile vetting) | **PASS** — [`ci/`](ci/), 19 semgrep rules, all tested against fixtures |
 | CI: post-deploy probe (headers, HTTPS, surface enumeration) | **DESIGNED, NOT BUILT** |
 | Distribution as a Claude Code plugin | **UNVERIFIED** — manifest schema not confirmed against current docs |
 
-**17 of the 43 security controls (39%) are mechanically checkable by CI this repo can ship** —
+**17 of the 44 security controls (38%) are mechanically checkable by CI this repo can ship** —
 12 at the PR gate, 5 against a deployed URL. Of the rest, 19 are a contract the consuming
-project must write tests for and 7 are actions someone takes and dates. The per-tier breakdown
+project must write tests for and 8 are actions someone takes and dates. The per-tier breakdown
 is in the mapping. Being explicit about which is which is more useful than automating the easy
 half and implying the rest.
 

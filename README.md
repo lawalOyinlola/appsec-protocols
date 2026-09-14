@@ -110,7 +110,7 @@ redirect everything. ASVS is more precise, and the mapping records that.
 **[mapping/asvs-5.0-coverage.md](mapping/asvs-5.0-coverage.md) is the honest version of this
 claim**, generated against the released standard with every citation machine-validated:
 
-- **118 of 345 ASVS 5.0 requirements (34%)** are touched by at least one of the 43 controls.
+- **118 of 345 ASVS 5.0 requirements (34%)** are touched by at least one of the 44 controls.
   The other 227 are not.
 - **Strongest:** V9 Self-contained Tokens (85%), V13 Configuration (66%), V5 File Handling (61%).
 - **Weakest:** V17 WebRTC (0%, out of scope by design), V6 Authentication (10% of 47
@@ -171,11 +171,21 @@ react-secure-auth-helper    ?           ?            NOT ON REGISTRY — verify 
 check catches. `react-secure-auth-helper` does not exist — the shape of an AI-hallucinated
 dependency, the name a squatter registers because models keep suggesting it.
 
+## Writing
+
+[`posts/`](posts/) holds the writing derived from these skills — a series working through the
+control groups, plus posts about the method. Each file carries the finished text as plain text
+in a code fence, ready to paste anywhere that does not render markdown, alongside the reasoning
+behind it.
+
+The series follows the same rule as the skills: no number that has not been checked, and every
+post that gives advice also says what it does not cover.
+
 ## Disclaimer
 
 **[DISCLAIMER.md](DISCLAIMER.md) — read it.** In short: `legal-compliance` is not legal advice
 and creates no lawyer–client relationship; `security-protocols` is a baseline, not a guarantee,
-and working all 43 controls does not make an application secure. It makes 43 common failures
+and working all 44 controls does not make an application secure. It makes 44 common failures
 less likely.
 
 ## License

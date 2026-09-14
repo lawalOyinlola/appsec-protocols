@@ -593,10 +593,14 @@ the files that ship in the bundle are a different object from the text that even
   production credentials, and prefer per-project scope over a global install. Surface matters:
   Claude Code skills have the same network access as any other program on the machine, while
   API-side skills run sandboxed without network.
-- **Verify:** list every URL reachable from an installed skill and account for each host.
-  `grep -rEoh 'https?://[^[:space:])"]+' ~/.claude/skills/ .claude/skills/ 2>/dev/null | sort -u`
-  A skill fetching instructions from a domain that is not the vendor's own is the finding:
-  remove it, or vendor a reviewed copy and drop the fetch.
+- **Verify:** inventory every URL reachable from an installed skill, plugin or MCP server, and
+  account for each host. Cover all three artefact types, not just skills:
+  `grep -rEoh 'https?://[^[:space:])"]+' ~/.claude/skills/ ~/.claude/plugins/ .claude/skills/ .claude/plugins/ ~/.claude.json .mcp.json 2>/dev/null | sort -u`
+  Every host must resolve to either an immutable reference (a pinned commit or content digest
+  that cannot change under you) or a copy you reviewed and vendored. **A vendor-owned domain is
+  not an exemption.** The failure mode is that fetched content changes after review, and a
+  legitimate domain can be compromised, expire, or change hands. Anything that is neither pinned
+  nor vendored is the finding: remove it, or vendor a reviewed copy and drop the fetch.
 
 ---
 

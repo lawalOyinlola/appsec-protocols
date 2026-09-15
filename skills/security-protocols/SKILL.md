@@ -593,13 +593,16 @@ the files that ship in the bundle are a different object from the text that even
   production credentials, and prefer per-project scope over a global install. Surface matters:
   Claude Code skills have the same network access as any other program on the machine, while
   API-side skills run sandboxed without network.
-- **Verify:** inventory every URL reachable from an installed skill, plugin or MCP server, and
-  account for each host. Cover all three artefact types, not just skills:
-  `grep -rEoh 'https?://[^[:space:])"]+' ~/.claude/skills/ ~/.claude/plugins/ .claude/skills/ .claude/plugins/ ~/.claude.json .mcp.json 2>/dev/null | sort -u`
+- **Verify:** inventory every URL reachable from an installed skill, plugin, or MCP server as well
+  as MCP and plugin executable sources (including `command` and `args` entries such as `npx`, `uvx`,
+  and `pipx`). Cover all three artefact types, not just skills:
+  `grep -rEoh 'https?://[^[:space:])"]+' ~/.claude/skills/ ~/.claude/plugins/ .claude/skills/ .claude/plugins/ ~/.claude.json .mcp.json 2>/dev/null | sed -E 's|(https?://)[^/@]+@|\1|g; s/([?&](token|key|secret|sig|signature|auth|access_token)=)[^&#[:space:]]+/\1REDACTED/gi' | sort -u`
+  `grep -rEoh '"(command|args)":\s*(\[[^]]*\]|"[^"]*")' ~/.claude.json .mcp.json ~/.claude/plugins/ .claude/plugins/ 2>/dev/null | sort -u`
   Every host must resolve to either an immutable reference (a pinned commit or content digest
-  that cannot change under you) or a copy you reviewed and vendored. **A vendor-owned domain is
-  not an exemption.** The failure mode is that fetched content changes after review, and a
-  legitimate domain can be compromised, expire, or change hands. Anything that is neither pinned
+  that cannot change under you) or a copy you reviewed and vendored. Every discovered executable
+  source must reference an integrity-locked package or a reviewed vendored executable. **A vendor-owned domain is
+  not an exemption.** The failure mode is that fetched content or executable packages change after review, and a
+  legitimate domain or package registry can be compromised, expire, or change hands. Anything that is neither pinned
   nor vendored is the finding: remove it, or vendor a reviewed copy and drop the fetch.
 
 ---

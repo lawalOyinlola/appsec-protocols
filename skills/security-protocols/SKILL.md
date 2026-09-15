@@ -596,8 +596,12 @@ the files that ship in the bundle are a different object from the text that even
 - **Verify:** inventory every URL reachable from an installed skill, plugin, or MCP server as well
   as MCP and plugin executable sources (including `command` and `args` entries such as `npx`, `uvx`,
   and `pipx`). Cover all three artefact types, not just skills:
-  `grep -rEoh 'https?://[^[:space:])"]+' ~/.claude/skills/ ~/.claude/plugins/ .claude/skills/ .claude/plugins/ ~/.claude.json .mcp.json 2>/dev/null | sed -E 's|(https?://)[^/@]+@|\1|g; s/([?&](token|key|secret|sig|signature|auth|access_token)=)[^&#[:space:]]+/\1REDACTED/gi' | sort -u`
-  `grep -rEoh '"(command|args)":\s*(\[[^]]*\]|"[^"]*")' ~/.claude.json .mcp.json ~/.claude/plugins/ .claude/plugins/ 2>/dev/null | sort -u`
+  `bash ci/scripts/vet-agent-installs.sh`
+  The script prints HTTP(S) URLs with userinfo and credential-bearing query/fragment
+  parameters (including `api_key`, `client_secret`, `X-Amz-Signature`) redacted, followed
+  by each discovered MCP/plugin executable invocation with credential argument values
+  redacted. It handles multiline JSON `args` arrays. Copy `ci/scripts/vet-agent-installs.sh`
+  from this repo if you are running the check outside of a project that includes it.
   Every host must resolve to either an immutable reference (a pinned commit or content digest
   that cannot change under you) or a copy you reviewed and vendored. Every discovered executable
   source must reference an integrity-locked package or a reviewed vendored executable. **A vendor-owned domain is

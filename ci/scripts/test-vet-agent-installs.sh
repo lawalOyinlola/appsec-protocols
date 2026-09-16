@@ -35,6 +35,8 @@ C_HEADER=$(canary header)
 C_ENV_BLOCK=$(canary envblock)
 C_NESTED=$(canary nested)
 C_FRAGMENT=$(canary fragment)
+C_ENCODED=$(canary encoded)
+ENC_TOKEN="ghp%5F$(printf 'Cd2%.0s' {1..12})"
 GH_TOKEN="ghp_$(printf 'Ab1%.0s' {1..12})"
 MIXED="$(printf 'Qx7%.0s' {1..10})"
 SHA="$(printf 'a1%.0s' {1..20})"
@@ -44,6 +46,7 @@ Fetch https://raw.githubusercontent.com/org/repo/$SHA/guide.md before starting.
 Then https://user:$C_USERINFO@docs.example.com/path?ref=v1.2.0&api-key=$C_HYPHEN
 And https://example.com/cb?Client-Secret=$C_CLIENT#access_token=$C_FRAGMENT
 And https://hooks.example.com/services/$MIXED
+And https://[2001:db8::44]/mcp?%74oken=$C_ENCODED&v=$ENC_TOKEN (IPv6).
 EOF
 ln -s "$FAKE_HOME/elsewhere/linked-skill" "$FAKE_HOME/.claude/skills/linked-skill"
 
@@ -99,7 +102,8 @@ output=$(cd "$PROJECT" && HOME="$FAKE_HOME" bash "$SCRIPT")
 fail=0
 echo "== no planted credential may be printed =="
 for secret in "$C_USERINFO" "$C_HYPHEN" "$C_CLIENT" "$C_FLAG_EQ" "$C_FLAG_NEXT" "$C_ENV_ARG" \
-  "$C_HEADER" "$C_ENV_BLOCK" "$C_NESTED" "$C_FRAGMENT" "$GH_TOKEN" "$MIXED"; do
+  "$C_HEADER" "$C_ENV_BLOCK" "$C_NESTED" "$C_FRAGMENT" "$GH_TOKEN" "$MIXED" "$C_ENCODED" \
+  "$ENC_TOKEN"; do
   if grep -qF -- "$secret" <<<"$output"; then
     echo "FAIL — leaked ${secret:0:14}…"
     fail=1
@@ -113,6 +117,7 @@ for expected in \
   "https://docs.example.com/path?ref=v1.2.0&api-key=REDACTED" \
   "https://example.com/cb?Client-Secret=REDACTED#access_token=REDACTED" \
   "https://hooks.example.com/services/REDACTED" \
+  "https://[2001:db8::44]/mcp?%74oken=REDACTED&v=REDACTED" \
   "https://example.org/local-skill" \
   "npx -y @scope/plugin-server@1.4.2 --api-token=REDACTED --client-secret REDACTED -e SERVICE_PASSWORD=REDACTED --header Authorization: REDACTED REDACTED  [plugin-server]" \
   "uvx global-server==0.3.1  [global-server]" \

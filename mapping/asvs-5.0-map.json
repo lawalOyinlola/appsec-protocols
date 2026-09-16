@@ -12,9 +12,10 @@
       "asvs": [
         "V13.3.1",
         "V13.3.2",
+        "V13.3.4",
         "V14.3.3"
       ],
-      "note": "ASVS treats this as secrets management generally; the control is narrower and sharper - no secret in a client bundle, and NEXT_PUBLIC_/VITE_/EXPO_PUBLIC_ vars are public identifiers only."
+      "note": "Now covers storage and access, not only exposure: V13.3.1 (a secrets management solution creates, stores, controls access to and destroys secrets) and V13.3.2 (access to secret assets follows least privilege). Earlier versions of this control cited both while covering neither - it stopped at 'do not ship it to the client'. The control adds what ASVS does not name: that a shared key cannot be revoked from one person, so offboarding is a rotation."
     },
     {
       "id": 2,
@@ -540,6 +541,14 @@
       "tier": 1,
       "asvs": [],
       "note": "NO ASVS COVERAGE. Searched the released standard for pipeline, CI/CD, branch, version control, merge, code review and commit: zero requirements match. The two near-hits are different concerns - V13.4.1 covers not deploying .git metadata, V15.2.4 covers component provenance. ASVS verifies the application, not the pipeline that ships it, so every CI-enforced control in this protocol rests on an assumption the standard never states."
+    },
+    {
+      "id": 44,
+      "title": "Vet what you install into your own agent",
+      "group": "I",
+      "tier": 4,
+      "asvs": [],
+      "note": "NO ASVS COVERAGE. ASVS 5.0.0 was released before agent skills existed as a distribution format, and verifies the application rather than the developer toolchain that builds it. Searched the released standard for skill, plugin, agent, extension and marketplace: no requirement addresses an artefact whose executed instructions are fetched at runtime from a publisher-controlled URL. The nearest neighbours are V15.2.x on component provenance, which assume a package whose contents are fixed at install time - precisely the assumption this control exists because attackers break. Tier 4: the installed set lives on a developer machine, not in the repository, so the control is an action someone takes and dates."
     }
   ]
 }

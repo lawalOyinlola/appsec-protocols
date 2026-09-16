@@ -10,7 +10,7 @@ It claims: each control below was read against the ASVS requirements listed besi
 
 It does **not** claim ASVS compliance, alignment, or equivalence at any assurance level. A control that 'maps to' a requirement often covers part of it, occasionally states it more concretely, and sometimes is simply adjacent. Where ASVS is better, the note says so.
 
-**Headline: 118 of 345 ASVS 5.0.0 requirements (34%) are touched by at least one of the 43 controls.** The other 227 (65%) are not, and the chapter table below says where.
+**Headline: 118 of 345 ASVS 5.0.0 requirements (34%) are touched by at least one of the 44 controls.** The other 227 (65%) are not, and the chapter table below says where.
 
 ## Coverage by ASVS chapter
 
@@ -49,7 +49,7 @@ Tiers describe how a control can be checked, not how important it is:
 
 | # | Control | Tier | ASVS 5.0 | Note |
 | ---: | --- | :---: | --- | --- |
-| 1 | Hide API keys | 1 | `V13.3.1`, `V13.3.2`, `V14.3.3` | ASVS treats this as secrets management generally; the control is narrower and sharper - no secret in a client bundle, and NEXT_PUBLIC_/VITE_/EXPO_PUBLIC_ vars are public identifiers only. |
+| 1 | Hide API keys | 1 | `V13.3.1`, `V13.3.2`, `V13.3.4`, `V14.3.3` | Now covers storage and access, not only exposure: V13.3.1 (a secrets management solution creates, stores, controls access to and destroys secrets) and V13.3.2 (access to secret assets follows least privilege). Earlier versions of this control cited both while covering neither - it stopped at 'do not ship it to the client'. The control adds what ASVS does not name: that a shared key cannot be revoked from one person, so offboarding is a rotation. |
 | 2 | Purge Git secrets | 1 | `V13.3.1`, `V13.3.4`, `V13.4.1` | PARTIAL. V13.4.1 covers not deploying .git metadata; V13.3.4 covers rotation. ASVS 5.0 has no requirement to scan or scrub version-control history for committed secrets. The rotate-then-scrub ordering is not in the standard. |
 | 3 | Use the public/anon key client-side | 1 | `V13.3.2`, `V8.3.1` | Least-privilege secret access, specialised to the BaaS anon-vs-service-role split that ASVS does not name. |
 
@@ -132,11 +132,13 @@ Tiers describe how a control can be checked, not how important it is:
 | 41 | Verify webhooks | 3 | `V4.1.5`, `V11.2.4` | PARTIAL GAP. V4.1.5 covers per-message digital signatures at L3 only; V11.2.4 covers constant-time comparison. ASVS has no requirement for webhook replay windows, event-id idempotency, or verifying over the raw pre-parse body. |
 | 42 | Keep payment authority on the server | 3 | `V2.2.2`, `V2.3.2`, `V8.3.1`, `V15.3.3` | PARTIAL. ASVS handles this as generic business-logic validation at a trusted service layer. It has no payment-specific requirement, so price tampering, coupon re-validation at charge time and webhook-as-source-of-truth are specialisations, not restatements. |
 | 43 | Make the security gate unbypassable | 1 | **none** | NO ASVS COVERAGE. Searched the released standard for pipeline, CI/CD, branch, version control, merge, code review and commit: zero requirements match. The two near-hits are different concerns - V13.4.1 covers not deploying .git metadata, V15.2.4 covers component provenance. ASVS verifies the application, not the pipeline that ships it, so every CI-enforced control in this protocol rests on an assumption the standard never states. |
+| 44 | Vet what you install into your own agent | 4 | **none** | NO ASVS COVERAGE. ASVS 5.0.0 was released before agent skills existed as a distribution format, and verifies the application rather than the developer toolchain that builds it. Searched the released standard for skill, plugin, agent, extension and marketplace: no requirement addresses an artefact whose executed instructions are fetched at runtime from a publisher-controlled URL. The nearest neighbours are V15.2.x on component provenance, which assume a package whose contents are fixed at install time - precisely the assumption this control exists because attackers break. Tier 4: the installed set lives on a developer machine, not in the repository, so the control is an action someone takes and dates. |
 
 ## Controls with no ASVS counterpart
 
 - **37. Back up, and prove the restore** — NO ASVS COVERAGE. ASVS 5.0 contains no backup or restore requirement - it verifies the application, not the operational practice around it. V14.2.7 covers retention and deletion, which is the opposite concern. This control has no counterpart in the standard.
 - **43. Make the security gate unbypassable** — NO ASVS COVERAGE. Searched the released standard for pipeline, CI/CD, branch, version control, merge, code review and commit: zero requirements match. The two near-hits are different concerns - V13.4.1 covers not deploying .git metadata, V15.2.4 covers component provenance. ASVS verifies the application, not the pipeline that ships it, so every CI-enforced control in this protocol rests on an assumption the standard never states.
+- **44. Vet what you install into your own agent** — NO ASVS COVERAGE. ASVS 5.0.0 was released before agent skills existed as a distribution format, and verifies the application rather than the developer toolchain that builds it. Searched the released standard for skill, plugin, agent, extension and marketplace: no requirement addresses an artefact whose executed instructions are fetched at runtime from a publisher-controlled URL. The nearest neighbours are V15.2.x on component provenance, which assume a package whose contents are fixed at install time - precisely the assumption this control exists because attackers break. Tier 4: the installed set lives on a developer machine, not in the repository, so the control is an action someone takes and dates.
 
 ## Automation feasibility
 
@@ -145,6 +147,6 @@ Tiers describe how a control can be checked, not how important it is:
 | 1 | PR gate - static, no running app | 1, 2, 3, 15, 17, 22, 23, 31, 33, 34, 36, 43 | 12 |
 | 2 | Post-deploy probe - needs a deployed URL | 9, 20, 21, 27, 28 | 5 |
 | 3 | Test-suite contract - the consuming project writes it | 4, 6, 7, 8, 11, 13, 14, 16, 18, 19, 24, 25, 26, 29, 30, 32, 40, 41, 42 | 19 |
-| 4 | Attested manual - the control is the date | 5, 10, 12, 35, 37, 38, 39 | 7 |
+| 4 | Attested manual - the control is the date | 5, 10, 12, 35, 37, 38, 39, 44 | 8 |
 
-**17 of 43 controls (39%) can be checked by CI this repository can ship.** The remaining 26 are a contract with the consuming project (Tier 3) or an action someone takes and dates (Tier 4). Automating the automatable subset and being explicit about the rest is the honest position; a green pipeline is evidence about Tiers 1 and 2 and nothing else.
+**17 of 44 controls (38%) can be checked by CI this repository can ship.** The remaining 27 are a contract with the consuming project (Tier 3) or an action someone takes and dates (Tier 4). Automating the automatable subset and being explicit about the rest is the honest position; a green pipeline is evidence about Tiers 1 and 2 and nothing else.

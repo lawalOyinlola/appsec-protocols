@@ -54,6 +54,14 @@ jobs:
       - name: every rule fires on vulnerable code, none on correct code
         run: ci/scripts/test-semgrep-rules.sh
 
+  vet-installs-selftest:
+    name: vet-installs selftest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: control 44 helper redacts every planted credential and finds every source
+        run: ci/scripts/test-vet-agent-installs.sh
+
   mapping:
     name: asvs mapping reproduces
     runs-on: ubuntu-latest

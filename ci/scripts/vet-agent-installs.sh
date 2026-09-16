@@ -39,7 +39,7 @@ import json
 import os
 import re
 import sys
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import unquote_plus, urlsplit, urlunsplit
 
 HOME = os.path.expanduser('~')
 TREES = [
@@ -56,7 +56,9 @@ SENSITIVE_NAME = re.compile(
 TOKEN_PREFIX = re.compile(
     r'(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|sk-|sk_live_|rk_live_|'
     r'xox[abeprs]-|AKIA|ASIA|AIza|ya29\.|npm_|pypi-|hf_|eyJ)[A-Za-z0-9_\-.]{8,}')
-URL = re.compile(r'https?://[^\s<>"\'`()\[\]{}\\]+')
+URL = re.compile(
+    r'https?://(?:\[[^\]\s<>"\'`(){}\\]+\]|[^\s<>"\'`()\[\]{}\\]+)'
+    r'[^\s<>"\'`()\[\]{}\\]*')
 FLAG = re.compile(r'^(--?)([A-Za-z0-9_.\-]+)(=(.*))?$', re.S)
 ASSIGN = re.compile(r'^([A-Za-z_][A-Za-z0-9_.\-]*)(=|:\s*)(.*)$', re.S)
 R = 'REDACTED'
@@ -78,9 +80,10 @@ def redact_pairs(text):
     out = []
     for part in text.split('&'):
         name, eq, value = part.partition('=')
-        if eq and (SENSITIVE_NAME.search(name) or looks_secret(value)):
+        if eq and (SENSITIVE_NAME.search(unquote_plus(name))
+                   or looks_secret(unquote_plus(value))):
             value = R
-        elif not eq and looks_secret(name):
+        elif not eq and looks_secret(unquote_plus(name)):
             name = R
         out.append(name + eq + value)
     return '&'.join(out)
@@ -93,7 +96,7 @@ def redact_url(url):
     except ValueError:
         return R
     netloc = parts.netloc.rpartition('@')[2]
-    path = '/'.join(R if looks_secret(seg) else seg for seg in parts.path.split('/'))
+    path = '/'.join(R if looks_secret(unquote_plus(seg)) else seg for seg in parts.path.split('/'))
     return urlunsplit((parts.scheme, netloc, path,
                        redact_pairs(parts.query), redact_pairs(parts.fragment)))
 

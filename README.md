@@ -10,7 +10,7 @@ after, when the finding is a rewrite instead of a line.
 
 | Skill | Controls | Scope |
 | --- | --- | --- |
-| [`security-protocols`](skills/security-protocols/SKILL.md) | 43 | Is the product **safe**? Secrets, data access, sessions, input/output, transport and supply chain, request surface, LLM features, injection surfaces, operations. |
+| [`security-protocols`](skills/security-protocols/SKILL.md) | 44 | Is the product **safe**? Secrets, data access, sessions, input/output, transport and supply chain, request surface, LLM features, injection surfaces, operations. |
 | [`legal-compliance`](skills/legal-compliance/SKILL.md) | 20 | Is the product **lawful**? Privacy policy, terms, AI disclosure, arbitration, auto-renewal, UGC/DMCA, app-store privacy labels — behind a jurisdiction gate. |
 | [`project-kickoff`](skills/project-kickoff/SKILL.md) | 18 | What must be true **before the first feature commit**. PRD, non-goals, ICP, locked stack, repo hygiene, environment separation, error tracking. |
 

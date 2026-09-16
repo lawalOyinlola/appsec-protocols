@@ -5,7 +5,7 @@ description: Baseline security protocol (44 controls) for any app that will be u
 
 # Security Protocols
 
-The non-negotiable baseline. Forty-three controls, grouped by the phase where they must be
+The non-negotiable baseline. Forty-four controls, grouped by the phase where they must be
 enforced. **Every control has a verification step — a control is not "done" until it has been
 proven with a command, a test, or an inspected response.** Claiming a control is satisfied
 without running its check is a violation of this protocol.
@@ -23,7 +23,7 @@ Which groups apply:
 ## How to use this skill
 
 - **Building a feature** → read the relevant group below *before* writing the code, not after.
-- **Pre-launch audit** → work all 43 in order, and write results to `tasks/security-audit.md`
+- **Pre-launch audit** → work all 44 in order, and write results to `tasks/security-audit.md`
   in the project (one line per control: `PASS` / `FAIL` / `N/A + why`). Never report a blanket
   "all secure" — report per control, with the evidence.
 - **Not applicable is a valid answer**, but it must be justified in one line. Silence is not.
@@ -597,11 +597,14 @@ the files that ship in the bundle are a different object from the text that even
   as MCP and plugin executable sources (including `command` and `args` entries such as `npx`, `uvx`,
   and `pipx`). Cover all three artefact types, not just skills:
   `bash ci/scripts/vet-agent-installs.sh`
-  The script prints HTTP(S) URLs with userinfo and credential-bearing query/fragment
-  parameters (including `api_key`, `client_secret`, `X-Amz-Signature`) redacted, followed
-  by each discovered MCP/plugin executable invocation with credential argument values
-  redacted. It handles multiline JSON `args` arrays. Copy `ci/scripts/vet-agent-installs.sh`
-  from this repo if you are running the check outside of a project that includes it.
+  The script prints every HTTP(S) URL, then every MCP server's `command` and `args` (or its
+  remote `url`), including local-scope servers nested under `projects` in `~/.claude.json`
+  and symlinked skills. Before printing, it redacts credentials by shape rather than by a
+  list of names: userinfo, any parameter, flag, `NAME=value` or header whose name looks like a
+  credential, and any value that looks like a token. It never prints `env` or `headers`.
+  Commit SHAs, package ids and versions stay visible, because they are what you are checking.
+  `ci/scripts/test-vet-agent-installs.sh` proves both halves. Copy the script from this repo
+  if you are running the check outside a project that includes it.
   Every host must resolve to either an immutable reference (a pinned commit or content digest
   that cannot change under you) or a copy you reviewed and vendored. Every discovered executable
   source must reference an integrity-locked package or a reviewed vendored executable. **A vendor-owned domain is

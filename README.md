@@ -14,14 +14,22 @@ after, when the finding is a rewrite instead of a line.
 | [`legal-compliance`](skills/legal-compliance/SKILL.md) | 20 | Is the product **lawful**? Privacy policy, terms, AI disclosure, arbitration, auto-renewal, UGC/DMCA, app-store privacy labels — behind a jurisdiction gate. |
 | [`project-kickoff`](skills/project-kickoff/SKILL.md) | 18 | What must be true **before the first feature commit**. PRD, non-goals, ICP, locked stack, repo hygiene, environment separation, error tracking. |
 
-**81 controls. 81 verification steps.** That ratio is the design constraint, and it is
-mechanically checkable:
+**82 controls. 82 verification steps.** That ratio is the design constraint, and it is
+mechanically checkable, per control rather than by totals (a control with no step and one with two
+would cancel out):
 
 ```bash
 for f in skills/*/SKILL.md; do
   echo "$(basename $(dirname $f)): controls=$(grep -cE '^### [0-9]+\.' $f) verify=$(grep -c 'Verify:' $f)"
+  awk '/^### [0-9]+\./ { if (id && n != 1) print FILENAME ": control " id " has " n " Verify: steps"
+                         id = $2; sub(/\.$/, "", id); n = 0; next }
+       { n += gsub(/Verify:/, "") }
+       END { if (id && n != 1) print FILENAME ": control " id " has " n " Verify: steps" }' $f
 done
 ```
+
+CI runs the same check, failing on any control without exactly one step:
+[`ci/scripts/check-verify-steps.sh`](ci/scripts/check-verify-steps.sh).
 
 ## The thesis
 

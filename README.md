@@ -20,18 +20,21 @@ would cancel out):
 
 ```bash
 for f in skills/*/SKILL.md; do
-  echo "$(basename $(dirname $f)): controls=$(grep -cE '^### [0-9]+\.' $f) verify=$(grep -c 'Verify:' $f)"
+  echo "$(basename $(dirname $f)): controls=$(grep -cE '^### [0-9]+\.' $f) verify=$(grep -cE '^[[:space:]]*- \*\*Verify:\*\*' $f)"
   awk 'function done() { if (id != "" && n != 1) print FILENAME ": control " id " has " n " Verify: steps"
                          id = "" }
-       /^### [0-9]+\./ { done(); id = $2; sub(/\.$/, "", id); n = 0; next }
-       /^##? /         { done(); next }
-       id != ""        { n += gsub(/Verify:/, "") }
-       END             { done() }' $f
+       /^[ \t]*(```|~~~)/ { fenced = !fenced; next }
+       fenced             { next }
+       /^### [0-9]+\./    { done(); id = $2; sub(/\.$/, "", id); n = 0; next }
+       /^##? /            { done(); next }
+       id != "" && /^[ \t]*- \*\*Verify:\*\*/ { n++ }
+       END                { done() }' $f
 done
 ```
 
 A control's scope ends at the next control, the next `#` or `##` heading, or end of file, so a
-`Verify:` in a group intro can't be credited to the control above it.
+`Verify:` in a group intro can't be credited to the control above it. Only a `- **Verify:**`
+bullet counts as a step; a passing mention in prose or an example in a code block does not.
 
 CI runs the same check, failing on any control without exactly one step:
 [`ci/scripts/check-verify-steps.sh`](ci/scripts/check-verify-steps.sh).

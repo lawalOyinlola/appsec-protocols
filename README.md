@@ -152,7 +152,8 @@ Honest state of the work, in the format the skills demand:
 | Distribution as a Claude Code plugin | **UNVERIFIED** — manifest schema not confirmed against current docs |
 
 **17 of the 44 security controls (38%) are mechanically checkable by CI this repo can ship** —
-12 at the PR gate, 5 against a deployed URL. Of the rest, 19 are a contract the consuming
+12 at the PR gate, 5 against a deployed URL (control 1 counts for its bundle grep; its second check,
+who can read each secret, is attested by hand). Of the rest, 19 are a contract the consuming
 project must write tests for and 8 are actions someone takes and dates. The per-tier breakdown
 is in the mapping. Being explicit about which is which is more useful than automating the easy
 half and implying the rest.

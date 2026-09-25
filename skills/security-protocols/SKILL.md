@@ -161,8 +161,9 @@ out by an attacker. Add backoff or lockout after repeated failures.
 CAPTCHA/Turnstile on signup, login, and public forms. Verify the token **server-side** — a
 client-side widget alone stops nothing.
 - Pair with an email-verification gate before an account can do anything meaningful.
-- **Verify:** POST to your signup route directly with `curl`, skipping the widget, once with no
-  token and once with a made-up one. Expect a 4xx both times and no account created.
+- **Verify:** POST directly with `curl` to signup, login and each public form, skipping the
+  widget, once with no token and once with a made-up one. Expect a 4xx every time, with no
+  account created, no session issued and nothing sent.
 
 ### 13. Verify JWTs properly
 A JWT is signed, not encrypted — anyone can read the payload, so never put a secret in it and

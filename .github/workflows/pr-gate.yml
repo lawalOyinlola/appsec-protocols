@@ -62,6 +62,14 @@ jobs:
       - name: control 44 helper redacts every planted credential and finds every source
         run: ci/scripts/test-vet-agent-installs.sh
 
+  verify-steps:
+    name: verify steps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: every control carries exactly one Verify step
+        run: ci/scripts/check-verify-steps.sh
+
   mapping:
     name: asvs mapping reproduces
     runs-on: ubuntu-latest

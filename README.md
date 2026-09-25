@@ -21,12 +21,17 @@ would cancel out):
 ```bash
 for f in skills/*/SKILL.md; do
   echo "$(basename $(dirname $f)): controls=$(grep -cE '^### [0-9]+\.' $f) verify=$(grep -c 'Verify:' $f)"
-  awk '/^### [0-9]+\./ { if (id && n != 1) print FILENAME ": control " id " has " n " Verify: steps"
-                         id = $2; sub(/\.$/, "", id); n = 0; next }
-       { n += gsub(/Verify:/, "") }
-       END { if (id && n != 1) print FILENAME ": control " id " has " n " Verify: steps" }' $f
+  awk 'function done() { if (id != "" && n != 1) print FILENAME ": control " id " has " n " Verify: steps"
+                         id = "" }
+       /^### [0-9]+\./ { done(); id = $2; sub(/\.$/, "", id); n = 0; next }
+       /^##? /         { done(); next }
+       id != ""        { n += gsub(/Verify:/, "") }
+       END             { done() }' $f
 done
 ```
+
+A control's scope ends at the next control, the next `#` or `##` heading, or end of file, so a
+`Verify:` in a group intro can't be credited to the control above it.
 
 CI runs the same check, failing on any control without exactly one step:
 [`ci/scripts/check-verify-steps.sh`](ci/scripts/check-verify-steps.sh).

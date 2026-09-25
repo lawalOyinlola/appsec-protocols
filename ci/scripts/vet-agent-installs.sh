@@ -1,34 +1,11 @@
 #!/usr/bin/env bash
-# ci/scripts/vet-agent-installs.sh
-#
-# Control 44 helper: inventory every HTTP(S) URL and every MCP/plugin
-# executable source reachable from agent configuration.
-#
-# Scanned: ~/.claude/skills, ~/.claude/plugins, ./.claude/skills, ./.claude/plugins
-# (symlinked skills are followed), ~/.claude.json and ./.mcp.json. Every
-# `mcpServers` object is found wherever it is nested, including the per-project
-# entries Claude Code keeps under `projects` in ~/.claude.json. A `mcpServers`
-# value that is a path or list of paths (allowed in plugin manifests) is skipped
-# here; the files it points at are scanned as part of the plugin directory.
-#
-# Redaction works on the shape of a value, not on a list of known names, so a
-# new spelling of a credential does not leak:
-#   - URL userinfo is dropped
-#   - a query/fragment parameter, `--flag=value`, `NAME=value` or `Name: value`
-#     whose name contains token, key, secret, passw, pwd, credential, auth, sig,
-#     session, cookie or bearer has its value replaced with REDACTED, and so does
-#     the argument after a bare credential flag such as `--api-key`
-#   - any remaining value that looks like a credential (a known token prefix, a
-#     JWT, or a long mixed-case alphanumeric string) is replaced with REDACTED
-# Lowercase hex (commit SHAs, digests), package ids and versions are kept,
-# because they are the evidence a reviewer needs. `env` and `headers` blocks
-# are never printed.
+# Control 44: list every HTTP(S) URL and MCP server command reachable from agent config
+# (skills, plugins, ~/.claude.json, .mcp.json), for review. Credentials are redacted by
+# shape rather than by a list of names, and env/headers values are never printed.
 #
 # Usage: bash ci/scripts/vet-agent-installs.sh
-# Review every line printed. Any URL that is not an immutable reference (pinned
-# commit or content digest) or a vendored copy is a finding. Any executable
-# source that is not integrity-locked or vendored is a finding.
-# Tested by ci/scripts/test-vet-agent-installs.sh.
+# A URL that is not pinned or vendored, or an executable that is not integrity-locked,
+# is a finding.
 
 set -euo pipefail
 
@@ -177,6 +154,22 @@ def find_servers(node, found):
             find_servers(item, found)
 
 
+SKIP_KEYS = {'env', 'headers'}
+
+
+def strings_outside_secrets(node):
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if str(key).lower() in SKIP_KEYS:
+                continue
+            yield from strings_outside_secrets(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from strings_outside_secrets(item)
+    elif isinstance(node, str):
+        yield node
+
+
 def describe(cfg):
     command = cfg.get('command')
     args = cfg.get('args', [])
@@ -200,13 +193,23 @@ for path in files:
     text = read_text(path)
     if text is None:
         continue
-    for m in URL.finditer(text):
-        urls.add(redact_url(m.group(0)))
+    data = None
     if path.endswith('.json'):
         try:
             data = json.loads(text)
         except ValueError:
+            data = None
+    if data is None:
+        if path.endswith('.json'):
+            # Unparsed JSON would expose env/headers to the raw scan.
+            print('skipped (not valid JSON, review by hand): ' + display(path), file=sys.stderr)
             continue
+        for m in URL.finditer(text):
+            urls.add(redact_url(m.group(0)))
+    else:
+        for value in strings_outside_secrets(data):
+            for m in URL.finditer(value):
+                urls.add(redact_url(m.group(0)))
         found = []
         find_servers(data, found)
         for name, cfg in found:

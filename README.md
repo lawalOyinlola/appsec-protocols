@@ -14,14 +14,33 @@ after, when the finding is a rewrite instead of a line.
 | [`legal-compliance`](skills/legal-compliance/SKILL.md) | 20 | Is the product **lawful**? Privacy policy, terms, AI disclosure, arbitration, auto-renewal, UGC/DMCA, app-store privacy labels — behind a jurisdiction gate. |
 | [`project-kickoff`](skills/project-kickoff/SKILL.md) | 18 | What must be true **before the first feature commit**. PRD, non-goals, ICP, locked stack, repo hygiene, environment separation, error tracking. |
 
-**81 controls. 81 verification steps.** That ratio is the design constraint, and it is
-mechanically checkable:
+**82 controls. 82 verification steps.** That ratio is the design constraint, and it is
+mechanically checkable, per control rather than by totals (a control with no step and one with two
+would cancel out):
 
 ```bash
 for f in skills/*/SKILL.md; do
-  echo "$(basename $(dirname $f)): controls=$(grep -cE '^### [0-9]+\.' $f) verify=$(grep -c 'Verify:' $f)"
+  echo "$(basename $(dirname $f)): controls=$(grep -cE '^### [0-9]+\.' $f) verify=$(grep -cE '^[[:space:]]*- \*\*Verify:\*\*' $f)"
+  awk 'function done() { if (id != "" && n != 1) print FILENAME ": control " id " has " n " Verify: steps"
+                         id = "" }
+       /^[ \t]*(```|~~~)/ { l = $0; sub(/^[ \t]*/, "", l); c = substr(l, 1, 1); k = 0
+                            while (substr(l, k + 1, 1) == c) k++
+                            if (!fenced) { fenced = 1; fc = c; fk = k; next }
+                            if (c == fc && k >= fk && substr(l, k + 1) ~ /^[ \t]*$/) { fenced = 0; next } }
+       fenced             { next }
+       /^### [0-9]+\./    { done(); id = $2; sub(/\.$/, "", id); n = 0; next }
+       /^##? /            { done(); next }
+       id != "" && /^[ \t]*- \*\*Verify:\*\*/ { n++ }
+       END                { done() }' $f
 done
 ```
+
+A control's scope ends at the next control, the next `#` or `##` heading, or end of file, so a
+`Verify:` in a group intro can't be credited to the control above it. Only a `- **Verify:**`
+bullet counts as a step; a passing mention in prose or an example in a code block does not.
+
+CI runs the same check, failing on any control without exactly one step:
+[`ci/scripts/check-verify-steps.sh`](ci/scripts/check-verify-steps.sh).
 
 ## The thesis
 
@@ -139,7 +158,8 @@ Honest state of the work, in the format the skills demand:
 | Distribution as a Claude Code plugin | **UNVERIFIED** — manifest schema not confirmed against current docs |
 
 **17 of the 44 security controls (38%) are mechanically checkable by CI this repo can ship** —
-12 at the PR gate, 5 against a deployed URL. Of the rest, 19 are a contract the consuming
+12 at the PR gate, 5 against a deployed URL (control 1 counts for its bundle grep; its second check,
+who can read each secret, is attested by hand). Of the rest, 19 are a contract the consuming
 project must write tests for and 8 are actions someone takes and dates. The per-tier breakdown
 is in the mapping. Being explicit about which is which is more useful than automating the easy
 half and implying the rest.

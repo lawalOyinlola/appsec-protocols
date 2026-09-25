@@ -5,7 +5,7 @@ except the ruleset self-test.
 
 ## What is actually automatable
 
-Of the 43 security controls, **17 (39%) can be checked by CI**. The other 26 cannot, and
+Of the 44 security controls, **17 (38%) can be checked by CI**. The other 27 cannot, and
 saying so plainly is the point — a pipeline that implies full coverage is worse than no
 pipeline, because it converts an unknown into a false reassurance.
 
@@ -14,7 +14,11 @@ pipeline, because it converts an unknown into a false reassurance.
 | 1 | The source, and the repository's own settings | 1, 2, 3, 15, 17, 22, 23, 31, 33, 34, 36, 43 | 12 | **built** — `pr-gate.yml` |
 | 2 | A deployed URL | 9, 20, 21, 27, 28 | 5 | designed, not built |
 | 3 | A running app and a test database | 4, 6, 7, 8, 11, 13, 14, 16, 18, 19, 24, 25, 26, 29, 30, 32, 40, 41, 42 | 19 | a contract, not a scanner |
-| 4 | A person, and the date they did it | 5, 10, 12, 35, 37, 38, 39 | 7 | cannot be automated |
+| 4 | A person, and the date they did it | 5, 10, 12, 35, 37, 38, 39, 44 | 8 | cannot be automated |
+
+**Control 1 is Tier 1 for its first check only.** The gate can grep a built bundle for keys. It
+cannot produce the control's second check, a list of every human and system that can read each
+production secret, so that half is an attested manual step: a green run says nothing about it.
 
 **Control 43 is Tier 1 but is not wired into `pr-gate.yml`.** Its check is a single command
 against the forge API, so it needs no running app — but reading branch protection requires the
@@ -52,6 +56,7 @@ control is FAIL.*
 | `semgrep/appsec-protocols.yml` | 19 rules covering controls 3, 15, 17, 31, 33, 34, 36, plus static patterns for 13. Each rule carries its control number and ASVS ids. |
 | `semgrep/fixtures/` | Vulnerable and correct code the rules are tested against. |
 | `scripts/test-semgrep-rules.sh` | Asserts every rule fires on vulnerable code and none fire on correct code. |
+| `scripts/check-verify-steps.sh` | Asserts every control in every skill has exactly one `Verify:` step, per control rather than by totals, so a missing step and a doubled one cannot cancel out. |
 | `scripts/lockfile-diff.sh` | Control 23. Lists packages a PR adds and flags new, little-used, or non-existent ones. |
 | `scripts/vet-agent-installs.sh` | Control 44. Inventories URLs and MCP/plugin executable sources in agent config, with credentials redacted. Run locally; it reads your own agent setup. |
 | `scripts/test-vet-agent-installs.sh` | Plants credentials in a throwaway agent config and asserts none reach the output and every source is inventoried. |

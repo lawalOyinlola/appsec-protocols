@@ -21,8 +21,8 @@ current status before acting on it. Apply that rule to this repository too.
 
 ## This is not a security guarantee
 
-`skills/security-protocols/` is a baseline, not a complete threat model. Working all 43
-controls does not make an application secure; it makes 43 specific and common failures less
+`skills/security-protocols/` is a baseline, not a complete threat model. Working all 44
+controls does not make an application secure; it makes 44 specific and common failures less
 likely. It does not cover threat modelling for your particular product, business-logic flaws,
 cryptographic design, physical or personnel security, or anything specific to your industry's
 regulatory regime.

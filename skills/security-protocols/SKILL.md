@@ -161,6 +161,9 @@ out by an attacker. Add backoff or lockout after repeated failures.
 CAPTCHA/Turnstile on signup, login, and public forms. Verify the token **server-side** — a
 client-side widget alone stops nothing.
 - Pair with an email-verification gate before an account can do anything meaningful.
+- **Verify:** POST directly with `curl` to signup, login and each public form, skipping the
+  widget, once with no token and once with a made-up one. Expect a 4xx every time, with no
+  account created, no session issued and nothing sent.
 
 ### 13. Verify JWTs properly
 A JWT is signed, not encrypted — anyone can read the payload, so never put a secret in it and
@@ -202,7 +205,6 @@ Most OAuth breaks are configuration, not cryptography.
 Parameterized queries or the ORM's query builder, always. Never build SQL by string
 concatenation or template literal with user input — including `ORDER BY`/table names, which
 can't be parameterized and must be whitelisted against a fixed allowlist.
-- **Verify:** grep for raw-SQL escapes: `$queryRawUnsafe`, `query(` with backticks, `.raw(`.
 - **NoSQL takes operator injection instead.** Mongo and friends have no string to escape; the
   attack is a *type* — a login body sending `{"password": {"$ne": null}}` or `{"$gt": ""}`
   where a string was expected turns the filter into "match anything". Parameterizing does not
@@ -212,8 +214,9 @@ can't be parameterized and must be whitelisted against a fixed allowlist.
     `strict`/unknown-key rejection is what actually closes this.
   - The same shape hits `$where`, `mapReduce`, and any operator that evaluates JS — don't
     expose them to user input at all.
-  - **Verify:** POST `{"email":"a@b.c","password":{"$ne":null}}` to your login route. Expect
-    a 400, never a session.
+- **Verify:** grep for raw-SQL escapes: `$queryRawUnsafe`, `query(` with backticks, `.raw(`.
+  On a NoSQL store, also POST `{"email":"a@b.c","password":{"$ne":null}}` to your login route.
+  Expect a 400, never a session.
 
 ### 16. Validate all input
 Schema-validate every request body, query param, and path param at the boundary

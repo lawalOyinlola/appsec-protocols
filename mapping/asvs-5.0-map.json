@@ -15,7 +15,7 @@
         "V13.3.4",
         "V14.3.3"
       ],
-      "note": "Now covers storage and access, not only exposure: V13.3.1 (a secrets management solution creates, stores, controls access to and destroys secrets) and V13.3.2 (access to secret assets follows least privilege). Earlier versions of this control cited both while covering neither - it stopped at 'do not ship it to the client'. The control adds what ASVS does not name: that a shared key cannot be revoked from one person, so offboarding is a rotation."
+      "note": "Now covers storage and access, not only exposure: V13.3.1 (a secrets management solution creates, stores, controls access to and destroys secrets) and V13.3.2 (access to secret assets follows least privilege). Earlier versions of this control cited both while covering neither - it stopped at 'do not ship it to the client'. The control adds what ASVS does not name: that a shared key cannot be revoked from one person, so offboarding is a rotation. Tier 1 covers check (1) only, the built-bundle grep, which the PR gate can run. Check (2), naming every human and system that can read each production secret, is an attested manual step: CI cannot produce that list, so a green pipeline is evidence about the grep and silence about who holds the secret."
     },
     {
       "id": 2,

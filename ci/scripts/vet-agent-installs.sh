@@ -22,7 +22,8 @@
 #     JWT, or a long mixed-case alphanumeric string) is replaced with REDACTED
 # Lowercase hex (commit SHAs, digests), package ids and versions are kept,
 # because they are the evidence a reviewer needs. `env` and `headers` blocks
-# are never printed.
+# are never printed: in JSON config the URL scan skips them at any depth too,
+# and falls back to scanning raw text only when a file is not valid JSON.
 #
 # Usage: bash ci/scripts/vet-agent-installs.sh
 # Review every line printed. Any URL that is not an immutable reference (pinned
@@ -177,6 +178,23 @@ def find_servers(node, found):
             find_servers(item, found)
 
 
+SKIP_KEYS = {'env', 'headers'}
+
+
+def strings_outside_secrets(node):
+    """Every string value in parsed JSON, except under an env or headers key at any depth."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if str(key).lower() in SKIP_KEYS:
+                continue
+            yield from strings_outside_secrets(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from strings_outside_secrets(item)
+    elif isinstance(node, str):
+        yield node
+
+
 def describe(cfg):
     command = cfg.get('command')
     args = cfg.get('args', [])
@@ -200,13 +218,21 @@ for path in files:
     text = read_text(path)
     if text is None:
         continue
-    for m in URL.finditer(text):
-        urls.add(redact_url(m.group(0)))
+    data = None
     if path.endswith('.json'):
         try:
             data = json.loads(text)
         except ValueError:
-            continue
+            data = None
+    if data is None:
+        # Not JSON, or JSON that does not parse: scan the raw text.
+        for m in URL.finditer(text):
+            urls.add(redact_url(m.group(0)))
+    else:
+        # Parsed JSON: scan string values only, never those under env or headers.
+        for value in strings_outside_secrets(data):
+            for m in URL.finditer(value):
+                urls.add(redact_url(m.group(0)))
         found = []
         find_servers(data, found)
         for name, cfg in found:

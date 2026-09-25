@@ -52,6 +52,7 @@ control is FAIL.*
 | `semgrep/appsec-protocols.yml` | 19 rules covering controls 3, 15, 17, 31, 33, 34, 36, plus static patterns for 13. Each rule carries its control number and ASVS ids. |
 | `semgrep/fixtures/` | Vulnerable and correct code the rules are tested against. |
 | `scripts/test-semgrep-rules.sh` | Asserts every rule fires on vulnerable code and none fire on correct code. |
+| `scripts/check-verify-steps.sh` | Asserts every control in every skill has exactly one `Verify:` step, per control rather than by totals, so a missing step and a doubled one cannot cancel out. |
 | `scripts/lockfile-diff.sh` | Control 23. Lists packages a PR adds and flags new, little-used, or non-existent ones. |
 | `scripts/vet-agent-installs.sh` | Control 44. Inventories URLs and MCP/plugin executable sources in agent config, with credentials redacted. Run locally; it reads your own agent setup. |
 | `scripts/test-vet-agent-installs.sh` | Plants credentials in a throwaway agent config and asserts none reach the output and every source is inventoried. |

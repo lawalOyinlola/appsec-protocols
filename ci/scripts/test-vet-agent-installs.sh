@@ -36,6 +36,10 @@ C_ENV_BLOCK=$(canary envblock)
 C_NESTED=$(canary nested)
 C_FRAGMENT=$(canary fragment)
 C_ENCODED=$(canary encoded)
+# URL-shaped values under env and headers. Lowercase with digits, so shape-based redaction
+# would print them untouched: only skipping those keys keeps them out of the URL list.
+C_ENV_URL=$(canary envurl)
+C_HDR_URL=$(canary hdrurl)
 ENC_TOKEN="ghp%5F$(printf 'Cd2%.0s' {1..12})"
 GH_TOKEN="ghp_$(printf 'Ab1%.0s' {1..12})"
 MIXED="$(printf 'Qx7%.0s' {1..10})"
@@ -72,7 +76,7 @@ cat > "$FAKE_HOME/.claude/plugins/demo/.mcp.json" <<EOF
         "Authorization: Bearer $C_HEADER",
         "$GH_TOKEN"
       ],
-      "env": {"SERVICE_TOKEN": "$C_ENV_BLOCK"}
+      "env": {"SERVICE_TOKEN": "$C_ENV_BLOCK", "WEBHOOK_URL": "https://hooks.example.com/services/$C_ENV_URL"}
     }
   }
 }
@@ -86,7 +90,8 @@ cat > "$FAKE_HOME/.claude.json" <<EOF
     "/some/project": {
       "mcpServers": {
         "nested-server": {"command": "pipx", "args": ["run", "nested-server", "--key", "$C_NESTED"]},
-        "remote-server": {"type": "http", "url": "https://mcp.example.com/mcp?token=$C_NESTED"}
+        "remote-server": {"type": "http", "url": "https://mcp.example.com/mcp?token=$C_NESTED",
+                          "headers": {"X-Callback": "https://cb.example.com/$C_HDR_URL"}}
       }
     }
   }
@@ -103,6 +108,7 @@ fail=0
 echo "== no planted credential may be printed =="
 for secret in "$C_USERINFO" "$C_HYPHEN" "$C_CLIENT" "$C_FLAG_EQ" "$C_FLAG_NEXT" "$C_ENV_ARG" \
   "$C_HEADER" "$C_ENV_BLOCK" "$C_NESTED" "$C_FRAGMENT" "$GH_TOKEN" "$MIXED" "$C_ENCODED" \
+  "$C_ENV_URL" "$C_HDR_URL" \
   "$ENC_TOKEN"; do
   if grep -qF -- "$secret" <<<"$output"; then
     echo "FAIL — leaked ${secret:0:14}…"

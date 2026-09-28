@@ -67,7 +67,11 @@ jobs:
         # Pin the version. If you prefer the container, resolve its digest yourself with
         # `docker buildx imagetools inspect semgrep/semgrep:<tag>` -- do not copy a digest
         # from anywhere you have not verified, including from this file.
-        run: pipx install semgrep==1.172.0
+        run: |
+          # "from versions: none" means the package index did not answer, not that the pin is
+          # wrong. Retry the install so a flaky index cannot fail the gate; the scan never retries.
+          for i in 1 2 3; do pipx install --force --pip-args="--retries 5 --timeout 30" semgrep==1.172.0 && exit 0; sleep 15; done
+          exit 1
       - name: appsec-protocols ruleset
         run: |
           semgrep --config ci/semgrep/appsec-protocols.yml \
@@ -120,6 +124,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: install semgrep
-        run: pipx install semgrep==1.172.0
+        run: |
+          # "from versions: none" means the package index did not answer, not that the pin is
+          # wrong. Retry the install so a flaky index cannot fail the gate; the scan never retries.
+          for i in 1 2 3; do pipx install --force --pip-args="--retries 5 --timeout 30" semgrep==1.172.0 && exit 0; sleep 15; done
+          exit 1
       - name: every rule fires on vulnerable code, none on correct code
         run: ci/scripts/test-semgrep-rules.sh

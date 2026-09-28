@@ -32,3 +32,10 @@ HANDOFF.md
 # ASVS release data, fetched at build time by mapping/build-coverage.py.
 # Not committed: it is OWASP content under CC BY-SA 4.0, and this repo is MIT.
 mapping/.asvs-cache.json
+
+# Writing kept local: the LinkedIn series, its index, source material and editor handoffs.
+# Only published long-form pieces in posts/blog/ are committed.
+posts/linkedin/
+posts/sources/
+posts/README.md
+posts/blog/HANDOFF-*.md

@@ -15,32 +15,21 @@ after, when the finding is a rewrite instead of a line.
 | [`project-kickoff`](skills/project-kickoff/SKILL.md) | 18 | What must be true **before the first feature commit**. PRD, non-goals, ICP, locked stack, repo hygiene, environment separation, error tracking. |
 
 **82 controls. 82 verification steps.** That ratio is the design constraint, and it is
-mechanically checkable, per control rather than by totals (a control with no step and one with two
-would cancel out):
+countable:
 
 ```bash
 for f in skills/*/SKILL.md; do
   echo "$(basename $(dirname $f)): controls=$(grep -cE '^### [0-9]+\.' $f) verify=$(grep -cE '^[[:space:]]*- \*\*Verify:\*\*' $f)"
-  awk 'function done() { if (id != "" && n != 1) print FILENAME ": control " id " has " n " Verify: steps"
-                         id = "" }
-       /^[ \t]*(```|~~~)/ { l = $0; sub(/^[ \t]*/, "", l); c = substr(l, 1, 1); k = 0
-                            while (substr(l, k + 1, 1) == c) k++
-                            if (!fenced) { fenced = 1; fc = c; fk = k; next }
-                            if (c == fc && k >= fk && substr(l, k + 1) ~ /^[ \t]*$/) { fenced = 0; next } }
-       fenced             { next }
-       /^### [0-9]+\./    { done(); id = $2; sub(/\.$/, "", id); n = 0; next }
-       /^##? /            { done(); next }
-       id != "" && /^[ \t]*- \*\*Verify:\*\*/ { n++ }
-       END                { done() }' $f
 done
+# legal-compliance: controls=20 verify=20
+# project-kickoff: controls=18 verify=18
+# security-protocols: controls=44 verify=44
 ```
 
-A control's scope ends at the next control, the next `#` or `##` heading, or end of file, so a
-`Verify:` in a group intro can't be credited to the control above it. Only a `- **Verify:**`
-bullet counts as a step; a passing mention in prose or an example in a code block does not.
-
-CI runs the same check, failing on any control without exactly one step:
-[`ci/scripts/check-verify-steps.sh`](ci/scripts/check-verify-steps.sh).
+Matching totals are the summary, not the proof: a control with no step and a control with two
+cancel out and still read 44. The per-control check,
+[`ci/scripts/check-verify-steps.sh`](ci/scripts/check-verify-steps.sh), fails any control without
+exactly one step, and it runs on every pull request.
 
 ## The thesis
 
@@ -194,12 +183,13 @@ dependency, the name a squatter registers because models keep suggesting it.
 
 ## Writing
 
-[`posts/`](posts/) holds the writing derived from these skills — a series working through the
-control groups, plus posts about the method. Each file carries the finished text as plain text
-in a code fence, ready to paste anywhere that does not render markdown, alongside the reasoning
-behind it.
+[`posts/blog/`](posts/blog/) holds the long-form writing derived from these skills, each file
+mirroring the version published on [lawaloyinlola.com](https://lawaloyinlola.com/blog), with the
+reasoning behind it kept in a comment at the end. The first is
+[A security checklist my coding agent has to run](posts/blog/security-protocols-skill.md), on how
+the controls became something you run rather than something you agree with.
 
-The series follows the same rule as the skills: no number that has not been checked, and every
+The writing follows the same rule as the skills: no number that has not been checked, and every
 post that gives advice also says what it does not cover.
 
 ## Disclaimer

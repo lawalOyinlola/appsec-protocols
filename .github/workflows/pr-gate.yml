@@ -38,7 +38,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: pipx install semgrep==1.172.0
+      - name: install semgrep
+        run: |
+          # "from versions: none" means the package index did not answer, not that the pin is
+          # wrong. Retry the install so a flaky index cannot fail the gate; the scan never retries.
+          for i in 1 2 3; do pipx install --force --pip-args="--retries 5 --timeout 30" semgrep==1.172.0 && exit 0; sleep 15; done
+          exit 1
       - name: this repo must pass its own ruleset
         # .semgrepignore excludes ci/semgrep/fixtures — the deliberately vulnerable code the
         # rules are tested against. That exclusion is why the selftest below scans a copy
@@ -50,7 +55,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: pipx install semgrep==1.172.0
+      - name: install semgrep
+        run: |
+          # "from versions: none" means the package index did not answer, not that the pin is
+          # wrong. Retry the install so a flaky index cannot fail the gate; the scan never retries.
+          for i in 1 2 3; do pipx install --force --pip-args="--retries 5 --timeout 30" semgrep==1.172.0 && exit 0; sleep 15; done
+          exit 1
       - name: every rule fires on vulnerable code, none on correct code
         run: ci/scripts/test-semgrep-rules.sh
 

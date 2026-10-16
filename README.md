@@ -188,6 +188,9 @@ mirroring the version published on [lawaloyinlola.com](https://lawaloyinlola.com
 reasoning behind it kept in a comment at the end. The first is
 [A security checklist my coding agent has to run](posts/blog/security-protocols-skill.md), on how
 the controls became something you run rather than something you agree with.
+[Your coding agent runs as you](posts/blog/the-skill-you-installed.md) covers control 44: why a
+skill that passed every scanner can still change after you installed it, and how to inventory what
+your agent can reach.
 
 The writing follows the same rule as the skills: no number that has not been checked, and every
 post that gives advice also says what it does not cover.

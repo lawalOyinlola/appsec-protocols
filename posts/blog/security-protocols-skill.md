@@ -6,6 +6,9 @@ tags: [security, appsec, ai, webdev]
 cover: https://lawaloyinlola.com/images/blog/security-checklist-my-agent-runs/coverimage.jpg
 coverAlt: "Two versions of the same checklist item. On the left, a clipboard line that has been ticked. On the right, an inspection tag for the same control, with a test written on it, a result of 401, and a date it was run."
 draft: false
+devto_id: 4742944
+devto_url: https://dev.to/lawaloyinlola/a-security-checklist-my-coding-agent-has-to-run-7b
+devto_published: true
 platform: blog
 published_on: lawaloyinlola.com
 published_url: https://lawaloyinlola.com/blog/security-checklist-my-agent-runs
@@ -33,7 +36,7 @@ And here is what it became, lightly trimmed from control 9:
 >
 > **Verify:** log in on two browsers, change the password in one, refresh the other. Expect a 401.
 
-![The two-browser test: log in on two browsers, change the password in one, and the other should get a 401 on its next request. If it stays logged in, that is the bug.](https://lawaloyinlola.com/images/blog/security-checklist-my-agent-runs/two-browser-test.jpg)
+![The two-browser test: log in on two browsers, change the password in one, and the other should get a 401 on its next request. If it stays logged in, that is the bug.](https://lawaloyinlola.com/images/blog/security-checklist-my-agent-runs/two-browser-test-v2.jpg)
 
 The second version takes thirty seconds to act on, and it can fail. That is the only difference that matters, and it is the difference between a checklist and a test.
 
@@ -48,7 +51,7 @@ done
 # security-protocols: controls=44 verify=44
 ```
 
-The totals on their own are not enough, and I found that out the hard way. They were the whole check at first, and they matched while control 12 had no verify step at all and control 15 had two, so both sides still read 44. The totals are now the summary, not the proof: a per-control check, [`ci/scripts/check-verify-steps.sh`](https://github.com/lawalOyinlola/appsec-protocols/blob/main/ci/scripts/check-verify-steps.sh), fails any control without exactly one step, and it runs on every pull request.
+The totals on their own are not enough, and this is how I found out. The first version of this loop only compared them, and they matched while control 12 had no verify step at all and control 15 had two, so both sides still read 44. So the totals are now the summary, not the proof: a per-control check, [`ci/scripts/check-verify-steps.sh`](https://github.com/lawalOyinlola/appsec-protocols/blob/main/ci/scripts/check-verify-steps.sh), fails any control without exactly one step, and it runs on every pull request.
 
 ## Why it is a skill and not a document
 

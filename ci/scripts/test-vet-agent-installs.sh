@@ -107,7 +107,12 @@ cat > "$PROJECT/.mcp.json" <<EOF
     "pinned-npx": {"command": "npx", "args": ["-y", "pinned-server@3.0.1"]},
     "pinned-uvx": {"command": "uvx", "args": ["pinned-uvx-server@0.9.0"]},
     "pinned-git": {"command": "npx", "args": ["github:org/git-server#$SHA"]},
-    "local-npx": {"command": "npx", "args": ["./tools/local-server"]}
+    "local-npx": {"command": "npx", "args": ["./tools/local-server"]},
+    "uvx-python": {"command": "uvx", "args": ["-p", "3.12", "py-flag-server==1.0.0"]},
+    "git-subdir": {"command": "uvx", "args": ["--from", "git+https://github.com/org/sub-server@$SHA#subdirectory=pkg", "sub-bin"]},
+    "win-path": {"command": "C:\\\\Program Files\\\\nodejs\\\\npx.cmd", "args": ["-y", "winpath-server"]},
+    "uvx-with": {"command": "uvx", "args": ["--with", "with-extra", "--with=with-eq", "with-main==2.0.0"]},
+    "npm-exec": {"command": "npm", "args": ["exec", "late-bin", "--package=late-server"]}
   }
 }
 EOF
@@ -169,7 +174,11 @@ for expected in \
   "bare-uvx-server: no version" \
   "from-server>=1.0: version range" \
   "star-server==1.*: version \"1.*\" is not an exact version" \
-  "nested-server: no version"; do
+  "nested-server: no version" \
+  "winpath-server: no version" \
+  "with-extra: no version" \
+  "with-eq: no version" \
+  "late-server: no version"; do
   if ! grep -qF -- "$expected" <<<"$findings"; then
     echo "FAIL — not flagged: $expected"
     unflagged=1
@@ -181,9 +190,17 @@ done
 echo "== exact versions, commit hashes and local paths must not be flagged =="
 overflagged=0
 for name in plugin-server global-server pinned-npx pinned-uvx pinned-git local-npx \
-  project-server remote-server; do
+  project-server remote-server uvx-python git-subdir; do
   if grep -qF -- "[$name]" <<<"$findings"; then
     echo "FAIL — wrongly flagged: $name"
+    overflagged=1
+    fail=1
+  fi
+done
+# Interpreter versions, binary names and pinned main packages must not be audited as packages.
+for spec in "3.12:" "late-bin:" "with-main==" "sub-server@"; do
+  if grep -qF -- "$spec" <<<"$findings"; then
+    echo "FAIL — wrongly flagged: $spec"
     overflagged=1
     fail=1
   fi

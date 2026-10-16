@@ -198,10 +198,23 @@ VALUE_FLAGS = {
            '--index-url', '-i', '--extra-index-url', '--index', '--default-index',
            '--find-links', '-f', '--spec', '--pip-args', '--constraint', '-c'},
 }
-SPEC_FLAGS = {'-p', '--package', '--from', '--spec'}
+# Flags naming the package to run. For uvx, -p is the interpreter, not a package.
+SPEC_FLAGS = {'npm': {'-p', '--package'}, 'py': {'--from', '--spec'}}
+# Flags naming extra packages installed alongside it, which run just the same.
+EXTRA_FLAGS = {'npm': set(), 'py': {'--with'}}
 EXACT_SEMVER = re.compile(r'^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.\-]+)?(?:\+[0-9A-Za-z.\-]+)?$')
-COMMIT = re.compile(r'(?:#|@)(?:commit=)?[0-9a-f]{40}$')
+# A 40-hex revision, optionally followed by a fragment such as #subdirectory=pkg.
+COMMIT = re.compile(r'(?:#|@)(?:commit=)?[0-9a-f]{40}(?:#[^#]*)?$')
 LOCAL = re.compile(r'^(?:\.{0,2}/|~/|[A-Za-z]:\\|file:)')
+
+
+def runner_name(token):
+    # Configs written on Windows use backslashes, which posix basename does not split.
+    name = token.replace('\\', '/').rsplit('/', 1)[-1].lower()
+    for ext in ('.cmd', '.exe'):
+        if name.endswith(ext):
+            name = name[:-len(ext)]
+    return name
 
 
 def launch_tokens(cfg):
@@ -213,9 +226,10 @@ def launch_tokens(cfg):
         args = [args]
     elif not isinstance(args, list):
         args = []
-    tokens = command.split() + [str(a) for a in args]
+    # With separate args, command is one path that may contain spaces (C:\Program Files\...).
+    tokens = ([command] if args else command.split()) + [str(a) for a in args]
     # Windows configs wrap the runner: cmd /c npx ...
-    if tokens and os.path.basename(tokens[0]).lower() in ('cmd', 'cmd.exe') \
+    if tokens and runner_name(tokens[0]) == 'cmd' \
             and len(tokens) > 1 and tokens[1].lower() == '/c':
         tokens = tokens[2:]
     return tokens
@@ -225,10 +239,8 @@ def package_specs(tokens):
     """Return (kind, [specs]) for a package-runner launch, or None for anything else."""
     if not tokens:
         return None
-    runner = os.path.basename(tokens[0]).lower()
+    runner = runner_name(tokens[0])
     rest = tokens[1:]
-    if runner.endswith('.cmd') or runner.endswith('.exe'):
-        runner = runner.rsplit('.', 1)[0]
     if runner in NPM_RUNNERS:
         kind = 'npm'
     elif runner in PY_RUNNERS:
@@ -241,31 +253,34 @@ def package_specs(tokens):
         kind, rest = 'py', rest[1:]
     else:
         return None
-    specs, i = [], 0
+    # npx stops reading its own options at the first positional; npm exec reads them until --.
+    scan_all = runner == 'npm'
+    named, extras, positional, i = [], [], None, 0
     while i < len(rest):
         arg = rest[i]
         if arg == '--':
-            if i + 1 < len(rest) and not specs:
-                specs.append(rest[i + 1])
+            if positional is None and i + 1 < len(rest):
+                positional = rest[i + 1]
             break
         if arg.startswith('-'):
             name, eq, value = arg.partition('=')
-            if name in SPEC_FLAGS:
-                if eq:
-                    specs.append(value)
-                elif i + 1 < len(rest):
-                    specs.append(rest[i + 1])
-                    i += 1
-            elif not eq and name in VALUE_FLAGS[kind]:
+            if not eq and name in VALUE_FLAGS[kind] and i + 1 < len(rest):
+                value = rest[i + 1]
                 i += 1
+            if value and name in SPEC_FLAGS[kind]:
+                named.append(value)
+            elif value and name in EXTRA_FLAGS[kind]:
+                extras.append(value)
             i += 1
             continue
-        # The first positional is the package unless a spec flag already named it; after
-        # that, everything belongs to the server.
-        if not specs:
-            specs.append(arg)
-        break
-    return kind, specs
+        if positional is None:
+            positional = arg
+        if not scan_all:
+            break
+        i += 1
+    # When a flag named the package, the positional is the binary to run, not a package.
+    specs = named or ([positional] if positional is not None else [])
+    return kind, specs + extras
 
 
 def unpinned_reason(kind, spec):

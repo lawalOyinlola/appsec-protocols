@@ -5,7 +5,9 @@
 #
 # Usage: bash ci/scripts/vet-agent-installs.sh
 # A URL that is not pinned or vendored, or an executable that is not integrity-locked,
-# is a finding.
+# is a finding. Servers launched through a package runner (npx, bunx, npm exec, pnpm/yarn
+# dlx, uvx, uv tool run, pipx run) without an exact version are flagged automatically,
+# because every start can pull new code.
 
 set -euo pipefail
 
@@ -185,10 +187,117 @@ def describe(cfg):
     return None
 
 
+NPM_RUNNERS = {'npx', 'bunx'}
+PY_RUNNERS = {'uvx'}
+# Runner flags that take a value as the next argument. Anything else starting with '-' is
+# treated as a switch.
+VALUE_FLAGS = {
+    'npm': {'-p', '--package', '-c', '--call', '-w', '--workspace', '--registry', '--cache',
+            '--userconfig', '--prefix'},
+    'py': {'--from', '--with', '--with-requirements', '--with-editable', '--python', '-p',
+           '--index-url', '-i', '--extra-index-url', '--index', '--default-index',
+           '--find-links', '-f', '--spec', '--pip-args', '--constraint', '-c'},
+}
+SPEC_FLAGS = {'-p', '--package', '--from', '--spec'}
+EXACT_SEMVER = re.compile(r'^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.\-]+)?(?:\+[0-9A-Za-z.\-]+)?$')
+COMMIT = re.compile(r'(?:#|@)(?:commit=)?[0-9a-f]{40}$')
+LOCAL = re.compile(r'^(?:\.{0,2}/|~/|[A-Za-z]:\\|file:)')
+
+
+def launch_tokens(cfg):
+    command = cfg.get('command')
+    if not isinstance(command, str) or not command.strip():
+        return []
+    args = cfg.get('args', [])
+    if isinstance(args, str):
+        args = [args]
+    elif not isinstance(args, list):
+        args = []
+    tokens = command.split() + [str(a) for a in args]
+    # Windows configs wrap the runner: cmd /c npx ...
+    if tokens and os.path.basename(tokens[0]).lower() in ('cmd', 'cmd.exe') \
+            and len(tokens) > 1 and tokens[1].lower() == '/c':
+        tokens = tokens[2:]
+    return tokens
+
+
+def package_specs(tokens):
+    """Return (kind, [specs]) for a package-runner launch, or None for anything else."""
+    if not tokens:
+        return None
+    runner = os.path.basename(tokens[0]).lower()
+    rest = tokens[1:]
+    if runner.endswith('.cmd') or runner.endswith('.exe'):
+        runner = runner.rsplit('.', 1)[0]
+    if runner in NPM_RUNNERS:
+        kind = 'npm'
+    elif runner in PY_RUNNERS:
+        kind = 'py'
+    elif runner in ('npm', 'pnpm', 'yarn') and rest and rest[0] in ('exec', 'x', 'dlx'):
+        kind, rest = 'npm', rest[1:]
+    elif runner == 'uv' and rest[:2] == ['tool', 'run']:
+        kind, rest = 'py', rest[2:]
+    elif runner == 'pipx' and rest and rest[0] == 'run':
+        kind, rest = 'py', rest[1:]
+    else:
+        return None
+    specs, i = [], 0
+    while i < len(rest):
+        arg = rest[i]
+        if arg == '--':
+            if i + 1 < len(rest) and not specs:
+                specs.append(rest[i + 1])
+            break
+        if arg.startswith('-'):
+            name, eq, value = arg.partition('=')
+            if name in SPEC_FLAGS:
+                if eq:
+                    specs.append(value)
+                elif i + 1 < len(rest):
+                    specs.append(rest[i + 1])
+                    i += 1
+            elif not eq and name in VALUE_FLAGS[kind]:
+                i += 1
+            i += 1
+            continue
+        # The first positional is the package unless a spec flag already named it; after
+        # that, everything belongs to the server.
+        if not specs:
+            specs.append(arg)
+        break
+    return kind, specs
+
+
+def unpinned_reason(kind, spec):
+    if LOCAL.match(spec):
+        return None
+    if '://' in spec or spec.startswith(('git+', 'github:', 'gitlab:', 'bitbucket:')) \
+            or ' @ ' in spec:
+        return None if COMMIT.search(spec) else 'source URL without a commit hash'
+    if kind == 'npm':
+        name, _, version = spec[1:].partition('@') if spec.startswith('@') \
+            else spec.partition('@')
+        if not version:
+            return 'no version, resolves to latest on every start'
+        if not EXACT_SEMVER.match(version):
+            return 'version "%s" is a tag or range, not an exact version' % version
+        return None
+    # name==1.2.3, name===1.2.3, or uv's name@1.2.3. `==1.*` is a range, `@latest` a tag.
+    m = re.match(r'^[A-Za-z0-9_.\-]+(?:\[[^\]]*\])?\s*(===?|@)\s*(\S+)$', spec)
+    if m:
+        op, version = m.groups()
+        exact = EXACT_SEMVER.match(version) if op == '@' else (
+            re.match(r'^v?[0-9][0-9A-Za-z.+!\-]*$', version) and '*' not in version)
+        return None if exact else 'version "%s" is not an exact version' % version
+    if re.search(r'[<>~!]=?|\*', spec):
+        return 'version range, not an exact version'
+    return 'no version, resolves to latest on every start'
+
+
 files = [f for t in TREES if os.path.isdir(t) for f in walk(t)]
 files += [f for f in CONFIG_FILES if os.path.isfile(f)]
 
-urls, servers = set(), set()
+urls, servers, unpinned = set(), set(), set()
 for path in files:
     text = read_text(path)
     if text is None:
@@ -216,6 +325,14 @@ for path in files:
             line = describe(cfg)
             if line:
                 servers.add('%s  [%s]  %s' % (line, name, display(path)))
+            launch = package_specs(launch_tokens(cfg))
+            if launch:
+                kind, specs = launch
+                for spec in specs or ['']:
+                    reason = unpinned_reason(kind, spec) if spec else 'no package found in args'
+                    if reason:
+                        unpinned.add('%s: %s  [%s]  %s' % (
+                            redact_value(spec) or '?', reason, name, display(path)))
 
 print('=== HTTP(S) URLs ===')
 for url in sorted(urls):
@@ -224,4 +341,12 @@ print()
 print('=== MCP servers (command + args, or remote url) ===')
 for line in sorted(servers):
     print(line)
+print()
+# An exact version stops a new release reaching you on the next start. It is not integrity
+# locking: the package's own dependencies still float, so vendoring is the stronger fix.
+print('=== Findings: package launches without an exact version (npx, uvx, pipx run, dlx) ===')
+for line in sorted(unpinned):
+    print(line)
+if not unpinned:
+    print('none')
 PYEOF

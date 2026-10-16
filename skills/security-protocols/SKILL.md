@@ -606,7 +606,14 @@ the files that ship in the bundle are a different object from the text that even
   list of names: userinfo, any parameter, flag, `NAME=value` or header whose name looks like a
   credential, and any value that looks like a token. It never prints `env` or `headers`.
   Commit SHAs, package ids and versions stay visible, because they are what you are checking.
-  `ci/scripts/test-vet-agent-installs.sh` proves both halves. Copy the script from this repo
+  It then flags, as findings, every server launched through a package runner (`npx`, `bunx`,
+  `npm exec`, `pnpm`/`yarn dlx`, `uvx`, `uv tool run`, `pipx run`) whose package has no exact
+  version: a bare name, a tag like `@latest`, a range, or a git source without a commit hash.
+  Shared configs often launch `npx -y some-server` with no version, so every start can pull new
+  code. An exact version stops that drift but is not integrity locking, since the package's own
+  dependencies still float; vendoring is the stronger fix.
+  `ci/scripts/test-vet-agent-installs.sh` proves all three: nothing leaks, every source is
+  listed, and floating launches are flagged while exact, hashed and local ones are not. Copy the script from this repo
   if you are running the check outside a project that includes it.
   Every host must resolve to either an immutable reference (a pinned commit or content digest
   that cannot change under you) or a copy you reviewed and vendored. Every discovered executable

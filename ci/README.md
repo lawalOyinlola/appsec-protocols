@@ -58,8 +58,8 @@ control is FAIL.*
 | `scripts/test-semgrep-rules.sh` | Asserts every rule fires on vulnerable code and none fire on correct code. |
 | `scripts/check-verify-steps.sh` | Asserts every control in every skill has exactly one `Verify:` step, per control rather than by totals, so a missing step and a doubled one cannot cancel out. |
 | `scripts/lockfile-diff.sh` | Control 23. Lists packages a PR adds and flags new, little-used, or non-existent ones. |
-| `scripts/vet-agent-installs.sh` | Control 44. Inventories URLs and MCP/plugin executable sources in agent config, with credentials redacted. Run locally; it reads your own agent setup. |
-| `scripts/test-vet-agent-installs.sh` | Plants credentials in a throwaway agent config and asserts none reach the output and every source is inventoried. |
+| `scripts/vet-agent-installs.sh` | Control 44. Inventories URLs and MCP/plugin executable sources in agent config, with credentials redacted, and flags servers launched via `npx`/`uvx`/`pipx run`/`dlx` without an exact version. Run locally; it reads your own agent setup. |
+| `scripts/test-vet-agent-installs.sh` | Plants credentials and package launches in a throwaway agent config and asserts none of the credentials reach the output, every source is inventoried, and only the unpinned launches are flagged. |
 
 ## Why the ruleset has its own test suite
 

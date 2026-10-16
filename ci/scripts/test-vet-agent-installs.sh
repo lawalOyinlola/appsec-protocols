@@ -88,8 +88,34 @@ cat > "$FAKE_HOME/.claude.json" <<EOF
 }
 EOF
 
-printf '{"mcpServers": {"project-server": {"command": "node", "args": ["./server.js"]}}}\n' \
-  > "$PROJECT/.mcp.json"
+# Package-runner launches: the unversioned and floating ones must be flagged, the exact and
+# local ones must not.
+cat > "$PROJECT/.mcp.json" <<EOF
+{
+  "mcpServers": {
+    "project-server": {"command": "node", "args": ["./server.js"]},
+    "bare-npx": {"command": "npx", "args": ["-y", "@scope/bare-server"]},
+    "latest-npx": {"command": "/usr/local/bin/npx", "args": ["--yes", "latest-server@latest", "--port", "3000"]},
+    "range-npx": {"command": "npx", "args": ["range-server@^2.1.0"]},
+    "string-npx": {"command": "npx -y string-server"},
+    "win-npx": {"command": "cmd", "args": ["/c", "npx", "-y", "win-server"]},
+    "pkg-flag": {"command": "npx", "args": ["--package=flag-server", "flag-bin"]},
+    "dlx": {"command": "pnpm", "args": ["dlx", "dlx-server"]},
+    "bare-uvx": {"command": "uvx", "args": ["--python", "3.12", "bare-uvx-server"]},
+    "from-uvx": {"command": "uvx", "args": ["--from", "from-server>=1.0", "from-bin"]},
+    "star-uvx": {"command": "uvx", "args": ["star-server==1.*"]},
+    "pinned-npx": {"command": "npx", "args": ["-y", "pinned-server@3.0.1"]},
+    "pinned-uvx": {"command": "uvx", "args": ["pinned-uvx-server@0.9.0"]},
+    "pinned-git": {"command": "npx", "args": ["github:org/git-server#$SHA"]},
+    "local-npx": {"command": "npx", "args": ["./tools/local-server"]},
+    "uvx-python": {"command": "uvx", "args": ["-p", "3.12", "py-flag-server==1.0.0"]},
+    "git-subdir": {"command": "uvx", "args": ["--from", "git+https://github.com/org/sub-server@$SHA#subdirectory=pkg", "sub-bin"]},
+    "win-path": {"command": "C:\\\\Program Files\\\\nodejs\\\\npx.cmd", "args": ["-y", "winpath-server"]},
+    "uvx-with": {"command": "uvx", "args": ["--with", "with-extra", "--with=with-eq", "with-main==2.0.0"]},
+    "npm-exec": {"command": "npm", "args": ["exec", "late-bin", "--package=late-server"]}
+  }
+}
+EOF
 printf 'See https://example.org/local-skill\n' > "$PROJECT/.claude/skills/local/SKILL.md"
 
 # Malformed JSON: nothing inside may be printed, and the file must be named on stderr.
@@ -132,6 +158,54 @@ for expected in \
   fi
 done
 [ "$missing" -eq 0 ] && echo "PASS"
+
+findings=$(sed -n '/^=== Findings:/,$p' <<<"$output")
+
+echo "== every unpinned package launch must be flagged =="
+unflagged=0
+for expected in \
+  "@scope/bare-server: no version" \
+  "latest-server@latest: version \"latest\" is a tag or range" \
+  "range-server@^2.1.0: version \"^2.1.0\" is a tag or range" \
+  "string-server: no version" \
+  "win-server: no version" \
+  "flag-server: no version" \
+  "dlx-server: no version" \
+  "bare-uvx-server: no version" \
+  "from-server>=1.0: version range" \
+  "star-server==1.*: version \"1.*\" is not an exact version" \
+  "nested-server: no version" \
+  "winpath-server: no version" \
+  "with-extra: no version" \
+  "with-eq: no version" \
+  "late-server: no version"; do
+  if ! grep -qF -- "$expected" <<<"$findings"; then
+    echo "FAIL — not flagged: $expected"
+    unflagged=1
+    fail=1
+  fi
+done
+[ "$unflagged" -eq 0 ] && echo "PASS"
+
+echo "== exact versions, commit hashes and local paths must not be flagged =="
+overflagged=0
+for name in plugin-server global-server pinned-npx pinned-uvx pinned-git local-npx \
+  project-server remote-server uvx-python git-subdir; do
+  if grep -qF -- "[$name]" <<<"$findings"; then
+    echo "FAIL — wrongly flagged: $name"
+    overflagged=1
+    fail=1
+  fi
+done
+# Interpreter versions, binary names and pinned main packages must not be audited as packages.
+for spec in "3.12:" "late-bin:" "with-main==" "sub-server@"; do
+  if grep -qF -- "$spec" <<<"$findings"; then
+    echo "FAIL — wrongly flagged: $spec"
+    overflagged=1
+    fail=1
+  fi
+done
+[ "$overflagged" -eq 0 ] && echo "PASS"
 
 echo "== a malformed JSON file must be named for manual review =="
 if grep -qF "skipped (not valid JSON, review by hand): ~/.claude/plugins/demo/broken.json" "$WORK/stderr"; then

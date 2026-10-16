@@ -5,7 +5,9 @@
 #
 # Usage: bash ci/scripts/vet-agent-installs.sh
 # A URL that is not pinned or vendored, or an executable that is not integrity-locked,
-# is a finding.
+# is a finding. Servers launched through a package runner (npx, bunx, npm exec, pnpm/yarn
+# dlx, uvx, uv tool run, pipx run) without an exact version are flagged automatically,
+# because every start can pull new code.
 
 set -euo pipefail
 
@@ -185,10 +187,132 @@ def describe(cfg):
     return None
 
 
+NPM_RUNNERS = {'npx', 'bunx'}
+PY_RUNNERS = {'uvx'}
+# Runner flags that take a value as the next argument. Anything else starting with '-' is
+# treated as a switch.
+VALUE_FLAGS = {
+    'npm': {'-p', '--package', '-c', '--call', '-w', '--workspace', '--registry', '--cache',
+            '--userconfig', '--prefix'},
+    'py': {'--from', '--with', '--with-requirements', '--with-editable', '--python', '-p',
+           '--index-url', '-i', '--extra-index-url', '--index', '--default-index',
+           '--find-links', '-f', '--spec', '--pip-args', '--constraint', '-c'},
+}
+# Flags naming the package to run. For uvx, -p is the interpreter, not a package.
+SPEC_FLAGS = {'npm': {'-p', '--package'}, 'py': {'--from', '--spec'}}
+# Flags naming extra packages installed alongside it, which run just the same.
+EXTRA_FLAGS = {'npm': set(), 'py': {'--with'}}
+EXACT_SEMVER = re.compile(r'^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.\-]+)?(?:\+[0-9A-Za-z.\-]+)?$')
+# A 40-hex revision, optionally followed by a fragment such as #subdirectory=pkg.
+COMMIT = re.compile(r'(?:#|@)(?:commit=)?[0-9a-f]{40}(?:#[^#]*)?$')
+LOCAL = re.compile(r'^(?:\.{0,2}/|~/|[A-Za-z]:\\|file:)')
+
+
+def runner_name(token):
+    # Configs written on Windows use backslashes, which posix basename does not split.
+    name = token.replace('\\', '/').rsplit('/', 1)[-1].lower()
+    for ext in ('.cmd', '.exe'):
+        if name.endswith(ext):
+            name = name[:-len(ext)]
+    return name
+
+
+def launch_tokens(cfg):
+    command = cfg.get('command')
+    if not isinstance(command, str) or not command.strip():
+        return []
+    args = cfg.get('args', [])
+    if isinstance(args, str):
+        args = [args]
+    elif not isinstance(args, list):
+        args = []
+    # With separate args, command is one path that may contain spaces (C:\Program Files\...).
+    tokens = ([command] if args else command.split()) + [str(a) for a in args]
+    # Windows configs wrap the runner: cmd /c npx ...
+    if tokens and runner_name(tokens[0]) == 'cmd' \
+            and len(tokens) > 1 and tokens[1].lower() == '/c':
+        tokens = tokens[2:]
+    return tokens
+
+
+def package_specs(tokens):
+    """Return (kind, [specs]) for a package-runner launch, or None for anything else."""
+    if not tokens:
+        return None
+    runner = runner_name(tokens[0])
+    rest = tokens[1:]
+    if runner in NPM_RUNNERS:
+        kind = 'npm'
+    elif runner in PY_RUNNERS:
+        kind = 'py'
+    elif runner in ('npm', 'pnpm', 'yarn') and rest and rest[0] in ('exec', 'x', 'dlx'):
+        kind, rest = 'npm', rest[1:]
+    elif runner == 'uv' and rest[:2] == ['tool', 'run']:
+        kind, rest = 'py', rest[2:]
+    elif runner == 'pipx' and rest and rest[0] == 'run':
+        kind, rest = 'py', rest[1:]
+    else:
+        return None
+    # npx stops reading its own options at the first positional; npm exec reads them until --.
+    scan_all = runner == 'npm'
+    named, extras, positional, i = [], [], None, 0
+    while i < len(rest):
+        arg = rest[i]
+        if arg == '--':
+            if positional is None and i + 1 < len(rest):
+                positional = rest[i + 1]
+            break
+        if arg.startswith('-'):
+            name, eq, value = arg.partition('=')
+            if not eq and name in VALUE_FLAGS[kind] and i + 1 < len(rest):
+                value = rest[i + 1]
+                i += 1
+            if value and name in SPEC_FLAGS[kind]:
+                named.append(value)
+            elif value and name in EXTRA_FLAGS[kind]:
+                extras.append(value)
+            i += 1
+            continue
+        if positional is None:
+            positional = arg
+        if not scan_all:
+            break
+        i += 1
+    # When a flag named the package, the positional is the binary to run, not a package.
+    specs = named or ([positional] if positional is not None else [])
+    return kind, specs + extras
+
+
+def unpinned_reason(kind, spec):
+    if LOCAL.match(spec):
+        return None
+    if '://' in spec or spec.startswith(('git+', 'github:', 'gitlab:', 'bitbucket:')) \
+            or ' @ ' in spec:
+        return None if COMMIT.search(spec) else 'source URL without a commit hash'
+    if kind == 'npm':
+        name, _, version = spec[1:].partition('@') if spec.startswith('@') \
+            else spec.partition('@')
+        if not version:
+            return 'no version, resolves to latest on every start'
+        if not EXACT_SEMVER.match(version):
+            return 'version "%s" is a tag or range, not an exact version' % version
+        return None
+    # name==1.2.3, name===1.2.3, or uv's name@1.2.3. `==1.*` is a range, `@latest` a tag.
+    m = re.match(r'^[A-Za-z0-9_.\-]+(?:\[[^\]]*\])?\s*(===?|@)\s*(\S+)$', spec)
+    if m:
+        op, version = m.groups()
+        exact = EXACT_SEMVER.match(version) if op == '@' else (
+            re.match(r'^v?[0-9][0-9A-Za-z.+!\-]*$', version) and '*' not in version)
+        return None if exact else 'version "%s" is not an exact version' % version
+    if re.search(r'[<>~!]=?|\*', spec):
+        return 'version range, not an exact version'
+    return 'no version, resolves to latest on every start'
+
+
 files = [f for t in TREES if os.path.isdir(t) for f in walk(t)]
 files += [f for f in CONFIG_FILES if os.path.isfile(f)]
 
-urls, servers = set(), set()
+urls, servers, unpinned = set(), set(), set()
 for path in files:
     text = read_text(path)
     if text is None:
@@ -216,6 +340,14 @@ for path in files:
             line = describe(cfg)
             if line:
                 servers.add('%s  [%s]  %s' % (line, name, display(path)))
+            launch = package_specs(launch_tokens(cfg))
+            if launch:
+                kind, specs = launch
+                for spec in specs or ['']:
+                    reason = unpinned_reason(kind, spec) if spec else 'no package found in args'
+                    if reason:
+                        unpinned.add('%s: %s  [%s]  %s' % (
+                            redact_value(spec) or '?', reason, name, display(path)))
 
 print('=== HTTP(S) URLs ===')
 for url in sorted(urls):
@@ -224,4 +356,12 @@ print()
 print('=== MCP servers (command + args, or remote url) ===')
 for line in sorted(servers):
     print(line)
+print()
+# An exact version stops a new release reaching you on the next start. It is not integrity
+# locking: the package's own dependencies still float, so vendoring is the stronger fix.
+print('=== Findings: package launches without an exact version (npx, uvx, pipx run, dlx) ===')
+for line in sorted(unpinned):
+    print(line)
+if not unpinned:
+    print('none')
 PYEOF

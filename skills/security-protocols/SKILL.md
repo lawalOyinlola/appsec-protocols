@@ -584,8 +584,10 @@ simply skip.
   `gh api repos/:owner/:repo/rules/branches/main --jq '[.[].type]'`
   A `404` from the first and `[]` from the second means there is no protection at all, which is
   the most common finding. A `404` from the first alone is not a finding when the second lists
-  `pull_request` and `required_status_checks`. For a ruleset, confirm its `bypass_actors` is
-  empty (`gh api repos/:owner/:repo/rulesets/<id> --jq .bypass_actors`). Confirm each required
+  `pull_request` and `required_status_checks`. For a ruleset, run
+  `gh api repos/:owner/:repo/rulesets/<id> --jq .bypass_actors` as a repository admin and
+  expect exactly `[]`. The API can leave the field out when the token is not allowed to see
+  it, so `null` means unverified, not empty. Confirm each required
   check name matches a job that actually runs. Last, scan the workflows for script injection:
   `semgrep --config ci/semgrep/appsec-protocols.yml --metrics=off .github/workflows`
   Any `appsec-actions-script-injection` finding fails this control.

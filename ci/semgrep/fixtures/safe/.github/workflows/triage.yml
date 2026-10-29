@@ -1,0 +1,35 @@
+# Safe: untrusted fields reach the script as environment variables, quoted, never as
+# expanded template text. Numbers and repository-controlled values may be expanded.
+name: triage
+on:
+  pull_request_target:
+  issue_comment:
+permissions:
+  contents: read
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: echo the title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: echo "Title was $TITLE"
+      - name: check the branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [[ "$HEAD_REF" == release/* ]]; then
+            echo "release branch"
+          fi
+      - name: comment on the pull request
+        run: gh pr comment "${{ github.event.pull_request.number }}" --body "triaged by ${{ github.workflow }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: echo the title by index, through env
+        env:
+          TITLE: ${{ github.event['pull_request']['title'] }}
+        run: echo "Title was $TITLE"
+      - name: label by number, index syntax
+        run: gh pr edit "${{ github.event['pull_request']['number'] }}" --add-label triaged
+        env:
+          GH_TOKEN: ${{ github.token }}

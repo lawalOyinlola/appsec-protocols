@@ -569,11 +569,28 @@ simply skip.
 - **Least privilege for the pipeline itself.** Default the workflow token to read-only and
   grant writes per job. A build step that can push to the default branch has undone this
   control. CI secrets must not be exposed to pull requests from forks.
+- **Never expand untrusted event data into a `run:` script.** GitHub substitutes `${{ }}` into
+  the script text before the shell starts, so `run: echo "${{ github.event.pull_request.title }}"`
+  runs whatever the title says, with the job's token and secrets. Pull request titles and
+  bodies, branch names (`github.head_ref`), issue and comment bodies and commit messages are all
+  written by whoever opened the event. Pass the value through `env:` and use it quoted
+  (`TITLE: ${{ … }}`, then `"$TITLE"`), so the shell receives data, not code. It matters most
+  under `pull_request_target` and `issue_comment`, which run with secrets on events a stranger
+  can create.
 - **Verify:** from a clean clone, commit directly to the default branch and push — expect a
-  rejection. Then read the protection back from the API rather than the settings page:
+  rejection. Then read the protection back from the API rather than the settings page. A
+  branch can be protected by a classic rule, a ruleset, or both, and each has its own endpoint:
   `gh api repos/:owner/:repo/branches/main/protection --jq '{checks: .required_status_checks.contexts, admins: .enforce_admins.enabled, force: .allow_force_pushes.enabled}'`
-  A `404` means there is no protection at all, which is the most common finding. Confirm each
-  listed check name matches a job that actually runs.
+  `gh api repos/:owner/:repo/rules/branches/main --jq '[.[].type]'`
+  A `404` from the first and `[]` from the second means there is no protection at all, which is
+  the most common finding. A `404` from the first alone is not a finding when the second lists
+  `pull_request` and `required_status_checks`. For a ruleset, run
+  `gh api repos/:owner/:repo/rulesets/<id> --jq .bypass_actors` as a repository admin and
+  expect exactly `[]`. The API can leave the field out when the token is not allowed to see
+  it, so `null` means unverified, not empty. Confirm each required
+  check name matches a job that actually runs. Last, scan the workflows for script injection:
+  `semgrep --config ci/semgrep/appsec-protocols.yml --metrics=off .github/workflows`
+  Any `appsec-actions-script-injection` finding fails this control.
 
 ### 44. Vet what you install into your own agent
 Your coding agent runs with your permissions: your filesystem, your credentials, your repo. A

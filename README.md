@@ -41,7 +41,11 @@ True, and useless at 2am — because it does not tell you what you would *do* to
 the item gets read, silently agreed with, ticked, and never tested. That is how a checklist
 becomes theatre.
 
-Every control here is written the other way round. Control 9, same requirement:
+Every control here is written the other way round.
+
+![A checklist item compared with control 9. The checklist item says to verify that session tokens are invalidated when the password changes, and it gets read, agreed with and ticked without anything being run. Control 9 states the same requirement with a verify step: log in on two browsers, change the password in one, refresh the other, and expect a 401.](assets/checklist-vs-control.svg)
+
+Here is control 9 in full, the same requirement as the item above:
 
 > Kill *every* session on password change or reset — not just the current one. The whole point
 > of a reset is evicting an attacker who already has a live session; leaving their other
@@ -90,6 +94,23 @@ directory that is not symlinked into the skills path is silently never registere
 command simply does not exist, with no error to tell you so.
 
 ## Use
+
+The skills do their most useful work before any code exists. The agent notices what it is about to
+write, loads the group that governs it, and writes against those controls. The same controls then
+become the audit, and each one comes back with one of three answers rather than a single green tick.
+
+```mermaid
+flowchart LR
+    A["Agent is about to write<br/>auth, DB access, uploads,<br/>an endpoint, payments, deploy config"] --> B["Matching skill<br/>loads on its own"]
+    B --> C["Code is written<br/>against that group<br/>of controls"]
+    C --> D["Each control's<br/>Verify step is run"]
+    D --> P["PASS"]
+    D --> F["FAIL"]
+    D --> N["NOT CHECKED<br/>(reported, never hidden)"]
+    P --> R["tasks/security-audit.md<br/>one line per control"]
+    F --> R
+    N --> R
+```
 
 - **While building** — the skills load on their own when the work touches what they govern.
   Read the relevant group *before* writing the code.
@@ -142,7 +163,8 @@ Honest state of the work, in the format the skills demand:
 | 44 / 20 / 18 controls, each with a verify step | **PASS** — 82/82, checkable with the command above |
 | Numbering sequential, cross-references resolve | **PASS** — verified 2026-09-14 |
 | ASVS 5.0 chapter mapping | **PASS** — [generated](mapping/asvs-5.0-coverage.md), 118/345 requirements touched, all 118 citations validated against the released standard |
-| CI: PR gate (secret scan, SAST, dependency audit, lockfile vetting) | **PASS** — [`ci/`](ci/), 19 semgrep rules, all tested against fixtures |
+| CI: PR gate (secret scan, SAST, dependency audit, lockfile vetting) | **PASS** — [`ci/`](ci/), 20 semgrep rules, all tested against fixtures |
+| Agent install inventory (control 44) | **PASS** — [`vet-agent-installs.sh`](ci/scripts/vet-agent-installs.sh) runs locally, its selftest runs on every pull request |
 | CI: post-deploy probe (headers, HTTPS, surface enumeration) | **DESIGNED, NOT BUILT** |
 | Distribution as a Claude Code plugin | **UNVERIFIED** — manifest schema not confirmed against current docs |
 
@@ -153,13 +175,42 @@ project must write tests for and 8 are actions someone takes and dates. The per-
 is in the mapping. Being explicit about which is which is more useful than automating the easy
 half and implying the rest.
 
+```mermaid
+pie showData title Who checks each of the 44 security controls
+    "PR gate, in CI today" : 12
+    "Post-deploy probe, designed but not built" : 5
+    "Tests the consuming project writes" : 19
+    "A person does it and dates it" : 8
+```
+
 Aligned to the threat landscape as of **2026-08**. Security guidance goes stale, and stale
 guidance actively misleads — if this date is far behind you, treat the specifics as suspect.
 
 ## CI
 
-[`ci/`](ci/) implements the Tier 1 PR gate: gitleaks, a 19-rule semgrep ruleset written
+[`ci/`](ci/) implements the Tier 1 PR gate: gitleaks, a 20-rule semgrep ruleset written
 against these controls, a dependency audit, and lockfile vetting for control 23.
+
+```mermaid
+flowchart LR
+    PR["Pull request"] --> S["Secret scan<br/>controls 1, 2"]
+    PR --> G["Semgrep, 20 rules<br/>controls 3, 13, 15, 17,<br/>31, 33, 34, 36, 43"]
+    PR --> D["Dependency audit<br/>and lockfile vetting<br/>controls 22, 23"]
+    PR --> T["Ruleset selftest<br/>the gate tests<br/>its own rules"]
+    S --> M{"All required<br/>checks green?"}
+    G --> M
+    D --> M
+    T --> M
+    M -- yes --> OK["Merge"]
+    M -- no --> X["Blocked, admins included<br/>(control 43)"]
+```
+
+The newest rule covers the half of control 43 that lives inside a workflow file. GitHub pastes
+`${{ }}` expressions into a `run:` script before the shell starts, so a step that echoes
+`github.event.pull_request.title` runs whatever the person who opened the pull request typed as
+the title, with the job's token and secrets in reach. `appsec-actions-script-injection` flags any
+attacker-controlled field expanded that way, and the fix it points to is passing the value
+through `env:` and quoting it, so the shell receives it as data.
 
 The ruleset has its own test suite ([`ci/scripts/test-semgrep-rules.sh`](ci/scripts/test-semgrep-rules.sh)),
 which asserts every rule fires on vulnerable code and none fire on correct code. Both halves
@@ -181,20 +232,34 @@ react-secure-auth-helper    ?           ?            NOT ON REGISTRY — verify 
 check catches. `react-secure-auth-helper` does not exist — the shape of an AI-hallucinated
 dependency, the name a squatter registers because models keep suggesting it.
 
+Control 44 has its own script, run locally because it reads your own agent setup rather than the
+code under review:
+
+```bash
+bash ci/scripts/vet-agent-installs.sh
+```
+
+It lists every URL reachable from your installed skills and plugins and every MCP server your agent
+is configured to start, with credentials redacted by shape before anything is printed. It then
+flags any server launched through `npx`, `uvx`, `pipx run` or `dlx` without an exact version,
+because a launch like `npx -y some-server` can pull new code every time the agent starts. That
+check came from a reader of the control 44 post.
+
 ## Writing
 
 [`posts/blog/`](posts/blog/) holds the long-form writing derived from these skills, each file
 mirroring the version published on [lawaloyinlola.com](https://lawaloyinlola.com/blog), with the
-reasoning behind it kept in a comment at the end. The first is
-[A security checklist my coding agent has to run](posts/blog/security-protocols-skill.md), on how
-the controls became something you run rather than something you agree with.
-[Prompt injection is an authority problem](posts/blog/prompt-injection-is-an-authority-problem.md)
-covers control 29: why the fix is that the model never holds authority, not better wording.
-[Your coding agent runs as you](posts/blog/the-skill-you-installed.md) covers control 44: why a
-skill that passed every scanner can still change after you installed it, and how to inventory what
-your agent can reach.
-[The three questions you get asked at 2am](posts/blog/what-you-want-at-2am.md) covers controls 35,
-36 and 38: why application logs are not an audit trail, and how the record becomes a liability.
+reasoning behind it kept in a comment at the end.
+
+- [A security checklist my coding agent has to run](posts/blog/security-protocols-skill.md): how
+  the controls became something you run rather than something you agree with.
+- [Prompt injection is an authority problem](posts/blog/prompt-injection-is-an-authority-problem.md),
+  control 29: the fix is that the model never holds authority, not better wording.
+- [Your coding agent runs as you](posts/blog/the-skill-you-installed.md), control 44: why a skill
+  that passed every scanner can still change after you installed it, and how to inventory what
+  your agent can reach.
+- [The three questions you get asked at 2am](posts/blog/what-you-want-at-2am.md), controls 35, 36
+  and 38: why application logs are not an audit trail, and how the record becomes a liability.
 
 The writing follows the same rule as the skills: no number that has not been checked, and every
 post that gives advice also says what it does not cover.

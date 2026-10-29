@@ -20,16 +20,22 @@ pipeline, because it converts an unknown into a false reassurance.
 cannot produce the control's second check, a list of every human and system that can read each
 production secret, so that half is an attested manual step: a green run says nothing about it.
 
-**Control 43 is Tier 1 but is not wired into `pr-gate.yml`.** Its check is a single command
-against the forge API, so it needs no running app — but reading branch protection requires the
-`administration` scope, which the default workflow token does not carry. Wiring it in means an
-explicit permission grant or a PAT, and a gate that needs elevated credentials to check itself
-is a tradeoff worth making deliberately rather than by default. Run it by hand, or in a job you
-have chosen to give that scope:
+**Control 43 is Tier 1 and only half wired into `pr-gate.yml`.** The script-injection half is
+in the ruleset: `appsec-actions-script-injection` flags an attacker-controlled event field
+(a pull request title, a branch name, a comment body) expanded into a `run:` script, so the
+`semgrep` job catches it on every pull request. The branch-protection half is not wired in. Its
+check is a command against the forge API, so it needs no running app — but reading classic
+branch protection requires the `administration` scope, which the default workflow token does
+not carry. Wiring it in means an explicit permission grant or a PAT, and a gate that needs
+elevated credentials to check itself is a tradeoff worth making deliberately rather than by
+default. Run it by hand, or in a job you have chosen to give that scope. Check both endpoints:
+a branch protected only by a ruleset returns `404` from the first, which is not a finding when
+the second lists `pull_request` and `required_status_checks`:
 
 ```bash
 gh api repos/:owner/:repo/branches/main/protection \
   --jq '{checks: .required_status_checks.contexts, admins: .enforce_admins.enabled}'
+gh api repos/:owner/:repo/rules/branches/main --jq '[.[].type]'
 ```
 
 **Control 13 (JWT) is the instructive case.** The ruleset does catch its static tells — an
@@ -53,7 +59,7 @@ control is FAIL.*
 | File | Purpose |
 | --- | --- |
 | `pr-gate.yml` | GitHub Actions workflow. Secret scan, SAST, dependency audit, lockfile vetting. |
-| `semgrep/appsec-protocols.yml` | 19 rules covering controls 3, 15, 17, 31, 33, 34, 36, plus static patterns for 13. Each rule carries its control number and ASVS ids. |
+| `semgrep/appsec-protocols.yml` | 20 rules covering controls 3, 15, 17, 31, 33, 34, 36, 43 (script injection only), plus static patterns for 13. Each rule carries its control number and ASVS ids. |
 | `semgrep/fixtures/` | Vulnerable and correct code the rules are tested against. |
 | `scripts/test-semgrep-rules.sh` | Asserts every rule fires on vulnerable code and none fire on correct code. |
 | `scripts/check-verify-steps.sh` | Asserts every control in every skill has exactly one `Verify:` step, per control rather than by totals, so a missing step and a doubled one cannot cancel out. |

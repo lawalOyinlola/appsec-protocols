@@ -1,6 +1,6 @@
 # Semgrep ruleset for the statically-checkable subset of security-protocols.
 #
-# Covers controls 3, 13, 15, 17, 31, 33, 34, 36. Each rule names its control so a
+# Covers controls 3, 13, 15, 17, 31, 33, 34, 36, 43. Each rule names its control so a
 # finding points at the protocol text that explains it, not just a CWE number.
 #
 # Scope: this is a PR gate (Tier 1), not an audit. These rules find the patterns that
@@ -363,3 +363,29 @@ rules:
       asvs: ["V16.2.5", "V16.4.2"]
     pattern-regex: |-
       (?i)(console\.(log|info|warn|error)|logger?\.(info|debug|warn|error)|print)\s*\([^)]{0,80}\b(password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|session[_-]?id)\b
+
+  # --------------------------------------------------------------- control 43
+  - id: appsec-actions-script-injection
+    languages: [yaml]
+    severity: ERROR
+    message: >-
+      Control 43: an attacker-controlled event field is expanded into a run: script. GitHub
+      substitutes ${{ }} into the script text before the shell starts, so a pull request
+      title, branch name, issue or comment body can close the quote and run its own
+      commands with the job's token and secrets. Pass the value through env: and use it
+      quoted ("$TITLE") so the shell receives it as data.
+    metadata:
+      control: 43
+      # No ASVS requirement covers the pipeline itself; see the control 43 note in
+      # mapping/asvs-5.0-coverage.md.
+      asvs: []
+      references:
+        - https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#understanding-the-risk-of-script-injections
+    patterns:
+      - pattern-inside: "steps: [...]"
+      - pattern: "run: $SCRIPT"
+      # Dotted and index syntax reach the same field: github.event.pull_request.title,
+      # github.event['pull_request']['title'] and github['head_ref'] are all untrusted.
+      - metavariable-regex:
+          metavariable: $SCRIPT
+          regex: '(?s).*\$\{\{\s*github(\.head_ref|\[\s*[''"]head_ref[''"]\s*\]|(\.event|\[\s*[''"]event[''"]\s*\])[\w.*\[\]''"\s-]*?(title|body|message|name|email|ref|label|head_branch|page_name|default_branch)\b)[^}]*\}\}'

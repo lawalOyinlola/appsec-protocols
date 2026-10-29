@@ -193,6 +193,8 @@ covers control 29: why the fix is that the model never holds authority, not bett
 [Your coding agent runs as you](posts/blog/the-skill-you-installed.md) covers control 44: why a
 skill that passed every scanner can still change after you installed it, and how to inventory what
 your agent can reach.
+[The three questions you get asked at 2am](posts/blog/what-you-want-at-2am.md) covers controls 35,
+36 and 38: why application logs are not an audit trail, and how the record becomes a liability.
 
 The writing follows the same rule as the skills: no number that has not been checked, and every
 post that gives advice also says what it does not cover.

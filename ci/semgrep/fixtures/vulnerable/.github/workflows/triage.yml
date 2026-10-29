@@ -19,3 +19,8 @@ jobs:
           fi
       - name: read the comment
         run: echo ${{ github.event.comment.body }} > comment.txt
+      # Index syntax reaches the same untrusted fields as dotted access.
+      - name: echo the title by index
+        run: echo "${{ github.event['pull_request']['title'] }}"
+      - name: check the branch by index
+        run: echo "${{ github['head_ref'] }}"

@@ -384,6 +384,8 @@ rules:
     patterns:
       - pattern-inside: "steps: [...]"
       - pattern: "run: $SCRIPT"
+      # Dotted and index syntax reach the same field: github.event.pull_request.title,
+      # github.event['pull_request']['title'] and github['head_ref'] are all untrusted.
       - metavariable-regex:
           metavariable: $SCRIPT
-          regex: '(?s).*\$\{\{\s*(github\.head_ref|github\.event\.[\w.*\[\]-]*(title|body|message|name|email|ref|label|head_branch|page_name|default_branch))\b[^}]*\}\}'
+          regex: '(?s).*\$\{\{\s*github(\.head_ref|\[\s*[''"]head_ref[''"]\s*\]|(\.event|\[\s*[''"]event[''"]\s*\])[\w.*\[\]''"\s-]*?(title|body|message|name|email|ref|label|head_branch|page_name|default_branch)\b)[^}]*\}\}'
